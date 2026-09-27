@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Prevent Next.js from bundling mongoose — it must run in Node.js only
-  experimental: {
-    serverComponentsExternalPackages: ['mongoose'],
+  // Backend API base URL — override with NEXT_PUBLIC_API_URL in production
+  env: {
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000',
   },
 };
 

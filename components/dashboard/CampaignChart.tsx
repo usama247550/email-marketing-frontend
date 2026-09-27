@@ -12,7 +12,7 @@ import {
   Area,
   AreaChart,
 } from 'recharts';
-import type { ChartPoint } from '@/lib/mockData';
+import type { ChartPoint } from '@/lib/mockData'; // chart data stays frontend-only (time-series mock)
 
 interface CampaignChartProps {
   data: ChartPoint[];
