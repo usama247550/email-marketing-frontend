@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { PROJECTS, type ProjectId } from '@/lib/mockData';
 import Topbar from '@/components/dashboard/Topbar';
 
@@ -174,10 +175,41 @@ const MOCK_TEMPLATES: Template[] = [
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function SendingPage() {
+  const searchParams = useSearchParams();
+  const viewCampaignId = searchParams.get('view'); // Check if we're viewing an existing campaign
+  const isViewMode = !!viewCampaignId;
+  
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedBatches, setSelectedBatches] = useState<Batch[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   
+  // Load campaign data if in view mode
+  useEffect(() => {
+    if (isViewMode && viewCampaignId) {
+      // Mock data for viewing a campaign - in real app this would come from API
+      const mockCampaignData = {
+        '1': {
+          project: MOCK_PROJECTS[0], // Arswift
+          batches: [MOCK_BATCHES[0]], // Frankfurt - Wellness Center
+          template: MOCK_TEMPLATES[0], // Wellness Outreach
+        },
+        '2': {
+          project: MOCK_PROJECTS[1], // Goldsilver.de
+          batches: [MOCK_BATCHES[1]], // berlin_restaurants.csv
+          template: MOCK_TEMPLATES[1], // Cold Intro – Tech
+        },
+        // Add more mock campaign data as needed
+      };
+
+      const campaignData = mockCampaignData[viewCampaignId as keyof typeof mockCampaignData];
+      if (campaignData) {
+        setSelectedProject(campaignData.project);
+        setSelectedBatches(campaignData.batches);
+        setSelectedTemplate(campaignData.template);
+      }
+    }
+  }, [isViewMode, viewCampaignId]);
+
   // Modal states
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showLeadsModal, setShowLeadsModal] = useState(false);
@@ -271,22 +303,26 @@ export default function SendingPage() {
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold text-gray-900">New Send</h1>
+              <h1 className="text-xl font-semibold text-gray-900">
+                {isViewMode ? 'Campaign Details' : 'New Send'}
+              </h1>
               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                Draft
+                {isViewMode ? 'Sent' : 'Draft'}
               </span>
             </div>
-            <button
-              onClick={() => setShowConfirmModal(true)}
-              disabled={!canSend}
-              className={`px-6 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
-                canSend
-                  ? 'bg-gray-900 hover:bg-gray-800 text-white'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              Send Now
-            </button>
+            {!isViewMode && (
+              <button
+                onClick={() => setShowConfirmModal(true)}
+                disabled={!canSend}
+                className={`px-6 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
+                  canSend
+                    ? 'bg-gray-900 hover:bg-gray-800 text-white'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                Send Now
+              </button>
+            )}
           </div>
 
           {/* Stacked Sections */}
@@ -315,9 +351,14 @@ export default function SendingPage() {
               </div>
               <button
                 onClick={() => setShowProjectModal(true)}
-                className="bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg border border-gray-200 transition-colors"
+                disabled={isViewMode}
+                className={`text-sm font-medium px-4 py-2 rounded-lg border transition-colors ${
+                  isViewMode
+                    ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
+                    : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
+                }`}
               >
-                Choose project
+                {isViewMode ? 'View project' : 'Choose project'}
               </button>
             </div>
 
@@ -344,9 +385,14 @@ export default function SendingPage() {
               </div>
               <button
                 onClick={() => setShowLeadsModal(true)}
-                className="bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg border border-gray-200 transition-colors"
+                disabled={isViewMode}
+                className={`text-sm font-medium px-4 py-2 rounded-lg border transition-colors ${
+                  isViewMode
+                    ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
+                    : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
+                }`}
               >
-                Choose leads
+                {isViewMode ? 'View leads' : 'Choose leads'}
               </button>
             </div>
 
@@ -374,9 +420,14 @@ export default function SendingPage() {
               </div>
               <button
                 onClick={() => setShowTemplateModal(true)}
-                className="bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg border border-gray-200 transition-colors"
+                disabled={isViewMode}
+                className={`text-sm font-medium px-4 py-2 rounded-lg border transition-colors ${
+                  isViewMode
+                    ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
+                    : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
+                }`}
               >
-                Choose template
+                {isViewMode ? 'View template' : 'Choose template'}
               </button>
             </div>
           </div>
