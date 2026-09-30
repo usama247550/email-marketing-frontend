@@ -60,3 +60,187 @@ export async function fetchCampaigns(project?: string) {
   const json = await res.json();
   return json.data as ApiCampaign[];
 }
+
+// ── Project API functions ─────────────────────────────────────────────────────
+
+export interface Project {
+  _id: string;
+  name: string;
+  senderEmail: string;
+  senderName?: string;
+  niche?: string;
+  websiteUrl?: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpUser?: string;
+  smtpPassword?: string;
+  createdAt: string;
+}
+
+export async function getProjects(): Promise<Project[]> {
+  try {
+    const res = await fetch(`${API_BASE}/projects`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Failed to fetch projects: ${res.status}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to fetch projects');
+    return json.data;
+  } catch (error) {
+    console.error('Error fetching projects:', error);
+    throw error;
+  }
+}
+
+export async function getProject(id: string): Promise<Project> {
+  try {
+    const res = await fetch(`${API_BASE}/projects/${id}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Failed to fetch project: ${res.status}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to fetch project');
+    return json.data;
+  } catch (error) {
+    console.error('Error fetching project:', error);
+    throw error;
+  }
+}
+
+export async function createProject(data: Partial<Project>): Promise<Project> {
+  try {
+    const res = await fetch(`${API_BASE}/projects`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(`Failed to create project: ${res.status}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to create project');
+    return json.data;
+  } catch (error) {
+    console.error('Error creating project:', error);
+    throw error;
+  }
+}
+
+export async function updateProject(id: string, data: Partial<Project>): Promise<Project> {
+  try {
+    const res = await fetch(`${API_BASE}/projects/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(`Failed to update project: ${res.status}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to update project');
+    return json.data;
+  } catch (error) {
+    console.error('Error updating project:', error);
+    throw error;
+  }
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  try {
+    const res = await fetch(`${API_BASE}/projects/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`Failed to delete project: ${res.status}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to delete project');
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    throw error;
+  }
+}
+
+// ── Template API functions ─────────────────────────────────────────────────────
+
+export interface Template {
+  _id: string;
+  name: string;
+  subject: string;
+  body: string;
+  variables: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getTemplates(): Promise<Template[]> {
+  try {
+    const res = await fetch(`${API_BASE}/templates`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Failed to fetch templates: ${res.status}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to fetch templates');
+    return json.data;
+  } catch (error) {
+    console.error('Error fetching templates:', error);
+    throw error;
+  }
+}
+
+export async function getTemplate(id: string): Promise<Template> {
+  try {
+    const res = await fetch(`${API_BASE}/templates/${id}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Failed to fetch template: ${res.status}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to fetch template');
+    return json.data;
+  } catch (error) {
+    console.error('Error fetching template:', error);
+    throw error;
+  }
+}
+
+export async function createTemplate(data: Partial<Template>): Promise<Template> {
+  try {
+    const res = await fetch(`${API_BASE}/templates`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(`Failed to create template: ${res.status}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to create template');
+    return json.data;
+  } catch (error) {
+    console.error('Error creating template:', error);
+    throw error;
+  }
+}
+
+export async function updateTemplate(id: string, data: Partial<Template>): Promise<Template> {
+  try {
+    const res = await fetch(`${API_BASE}/templates/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(`Failed to update template: ${res.status}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to update template');
+    return json.data;
+  } catch (error) {
+    console.error('Error updating template:', error);
+    throw error;
+  }
+}
+
+export async function deleteTemplate(id: string): Promise<void> {
+  try {
+    const res = await fetch(`${API_BASE}/templates/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`Failed to delete template: ${res.status}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to delete template');
+  } catch (error) {
+    console.error('Error deleting template:', error);
+    throw error;
+  }
+}

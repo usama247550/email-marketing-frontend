@@ -121,13 +121,22 @@ export default function LeadsPage() {
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   const [batchesPage, setBatchesPage] = useState(1);
   const [leadsPage, setLeadsPage] = useState(1);
+  
+  // CSV Import states
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [csvData, setCsvData] = useState<string[][]>([]);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [columnMappings, setColumnMappings] = useState<Record<string, number>>({});
+  const [importStep, setImportStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
+  const [batches, setBatches] = useState<Batch[]>(MOCK_BATCHES);
 
   const BATCHES_PER_PAGE = 12;
   const LEADS_PER_PAGE = 15;
 
   // Pagination for batches
-  const totalBatchesPages = Math.ceil(MOCK_BATCHES.length / BATCHES_PER_PAGE);
-  const paginatedBatches = MOCK_BATCHES.slice(
+  const totalBatchesPages = Math.ceil(batches.length / BATCHES_PER_PAGE);
+  const paginatedBatches = batches.slice(
     (batchesPage - 1) * BATCHES_PER_PAGE,
     batchesPage * BATCHES_PER_PAGE
   );
@@ -156,6 +165,142 @@ export default function LeadsPage() {
       day: 'numeric',
       year: 'numeric'
     });
+  };
+
+  // CSV Import Functions
+  const parseCSV = (content: string): string[][] => {
+    const lines = content.split('\n').filter(line => line.trim());
+    return lines.map(line => {
+      // Simple CSV parsing - split by comma but handle quotes
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    });
+  };
+
+  const detectColumnMappings = (headers: string[]): Record<string, number> => {
+    const mappings: Record<string, number> = {};
+    const lowerHeaders = headers.map(h => h.toLowerCase());
+    
+    // Auto-detect common column names
+    const patterns = {
+      company: ['company', 'business', 'name', 'company name', 'business name'],
+      email: ['email', 'e-mail', 'mail', 'email address'],
+      website: ['website', 'url', 'site', 'web', 'domain'],
+      city: ['city', 'location', 'place', 'town']
+    };
+    
+    Object.entries(patterns).forEach(([field, variants]) => {
+      for (let i = 0; i < lowerHeaders.length; i++) {
+        const header = lowerHeaders[i];
+        if (variants.some(variant => header.includes(variant))) {
+          mappings[field] = i;
+          break;
+        }
+      }
+    });
+    
+    return mappings;
+  };
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !file.name.toLowerCase().endsWith('.csv')) {
+      alert('Please select a valid CSV file');
+      return;
+    }
+    
+    setSelectedFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      const parsed = parseCSV(content);
+      
+      if (parsed.length === 0) {
+        alert('The CSV file appears to be empty');
+        return;
+      }
+      
+      const headers = parsed[0];
+      const data = parsed.slice(1);
+      
+      setCsvHeaders(headers);
+      setCsvData(data);
+      setColumnMappings(detectColumnMappings(headers));
+      setImportStep('mapping');
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImport = () => {
+    if (!selectedFile || csvData.length === 0) return;
+    
+    const leads: Lead[] = csvData.map((row, index) => {
+      const company = columnMappings.company !== undefined ? row[columnMappings.company] || '' : `Company ${index + 1}`;
+      const email = columnMappings.email !== undefined ? row[columnMappings.email] || '' : '';
+      const website = columnMappings.website !== undefined ? row[columnMappings.website] || '' : '';
+      const city = columnMappings.city !== undefined ? row[columnMappings.city] || '' : '';
+      
+      return {
+        id: `imported-${Date.now()}-${index}`,
+        company: company.replace(/"/g, ''), // Remove quotes
+        email: email.replace(/"/g, ''),
+        website: website.replace(/"/g, ''),
+        city: city.replace(/"/g, ''),
+        status: validateEmail(email.replace(/"/g, '')) ? 'Valid' : 'Invalid'
+      };
+    });
+
+    const newBatch: Batch = {
+      id: `batch-${Date.now()}`,
+      name: selectedFile.name,
+      source: 'CSV Import',
+      date: new Date().toISOString().split('T')[0],
+      leadCount: leads.length,
+      leads
+    };
+
+    // Add to beginning of batches (newest first)
+    setBatches([newBatch, ...batches]);
+    
+    // Reset modal state
+    setShowImportModal(false);
+    setSelectedFile(null);
+    setCsvData([]);
+    setCsvHeaders([]);
+    setColumnMappings({});
+    setImportStep('upload');
+    
+    // Show success message
+    alert(`Batch imported successfully! ${leads.length} leads added.`);
+  };
+
+  const resetImportModal = () => {
+    setShowImportModal(false);
+    setSelectedFile(null);
+    setCsvData([]);
+    setCsvHeaders([]);
+    setColumnMappings({});
+    setImportStep('upload');
   };
 
   const Pagination = ({ currentPage, totalPages, onPageChange }: {
@@ -227,11 +372,26 @@ export default function LeadsPage() {
         {currentView === 'batches' && (
           <>
             {/* Page heading */}
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Lead Batches</h1>
-              <p className="text-sm text-gray-400 mt-0.5">
-                Manage your imported and generated lead batches.
-              </p>
+            <div className="flex items-start justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Lead Batches</h1>
+                <p className="text-sm text-gray-400 mt-0.5">
+                  Manage your imported and generated lead batches.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowImportModal(true)}
+                className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors shrink-0"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/>
+                  <line x1="16" y1="17" x2="8" y2="17"/>
+                  <polyline points="10 9 9 9 8 9"/>
+                </svg>
+                Import CSV
+              </button>
             </div>
 
             {/* Batches table */}
@@ -409,6 +569,155 @@ export default function LeadsPage() {
           </>
         )}
       </div>
+
+      {/* CSV Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Import CSV</h2>
+              <button
+                onClick={resetImportModal}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              {/* Step 1: File Upload */}
+              {importStep === 'upload' && (
+                <div className="text-center">
+                  <div className="mb-4">
+                    <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                      <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Upload CSV File</h3>
+                  <p className="text-sm text-gray-500 mb-6">
+                    Select a CSV file containing your leads. Expected columns: Company, Email, Website, City.
+                  </p>
+                  
+                  <label className="relative cursor-pointer">
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleFileUpload}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div className="bg-accent hover:bg-accent-hover text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                      Choose CSV File
+                    </div>
+                  </label>
+                  
+                  {selectedFile && (
+                    <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                      <p className="text-sm text-green-800">
+                        Selected: <span className="font-medium">{selectedFile.name}</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 2: Column Mapping */}
+              {importStep === 'mapping' && (
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Map Columns</h3>
+                  <p className="text-sm text-gray-500 mb-6">
+                    {csvData.length} rows detected. Please verify the column mappings:
+                  </p>
+                  
+                  <div className="space-y-4 mb-6">
+                    {['company', 'email', 'website', 'city'].map((field) => (
+                      <div key={field} className="flex items-center justify-between">
+                        <label className="text-sm font-medium text-gray-700 capitalize">
+                          {field}
+                          {field === 'company' || field === 'email' ? (
+                            <span className="text-red-500 ml-1">*</span>
+                          ) : null}
+                        </label>
+                        <select
+                          value={columnMappings[field] ?? ''}
+                          onChange={(e) => setColumnMappings(prev => ({
+                            ...prev,
+                            [field]: e.target.value ? parseInt(e.target.value) : undefined
+                          }))}
+                          className="w-48 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
+                        >
+                          <option value="">-- Select Column --</option>
+                          {csvHeaders.map((header, index) => (
+                            <option key={index} value={index}>
+                              {header || `Column ${index + 1}`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Preview */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden mb-6">
+                    <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                      <h4 className="text-sm font-medium text-gray-900">Preview (first 3 rows)</h4>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Website</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">City</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {csvData.slice(0, 3).map((row, index) => (
+                            <tr key={index} className="border-t border-gray-200">
+                              <td className="px-3 py-2 text-gray-900">
+                                {columnMappings.company !== undefined ? row[columnMappings.company] || '-' : '-'}
+                              </td>
+                              <td className="px-3 py-2 text-gray-900">
+                                {columnMappings.email !== undefined ? row[columnMappings.email] || '-' : '-'}
+                              </td>
+                              <td className="px-3 py-2 text-gray-900">
+                                {columnMappings.website !== undefined ? row[columnMappings.website] || '-' : '-'}
+                              </td>
+                              <td className="px-3 py-2 text-gray-900">
+                                {columnMappings.city !== undefined ? row[columnMappings.city] || '-' : '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setImportStep('upload')}
+                      className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={handleImport}
+                      disabled={!columnMappings.company || !columnMappings.email}
+                      className="px-6 py-2 text-sm font-medium text-white bg-accent hover:bg-accent-hover disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors"
+                    >
+                      Import {csvData.length} Leads
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

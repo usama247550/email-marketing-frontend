@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Topbar from '@/components/dashboard/Topbar';
+import { FALLBACK_COUNTRIES, type StaticCountry } from '@/lib/countries';
 
 interface Country {
   name: {
@@ -26,7 +27,7 @@ export default function LeadFinderPage() {
 
   const [countries, setCountries] = useState<Country[]>([]);
   const [countriesLoading, setCountriesLoading] = useState(false);
-  const [countriesError, setCountriesError] = useState<string | null>(null);
+  const [usingFallbackData, setUsingFallbackData] = useState(false);
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [countrySearchTerm, setCountrySearchTerm] = useState('Germany');
   const [selectedCountryFlag, setSelectedCountryFlag] = useState('🇩🇪');
@@ -34,26 +35,68 @@ export default function LeadFinderPage() {
   const countryInputRef = useRef<HTMLInputElement>(null);
   const countryDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Fetch countries from REST Countries API
+  // Convert static country to API format
+  const convertStaticToApiFormat = (staticCountry: StaticCountry): Country => ({
+    name: staticCountry.name,
+    flags: {
+      png: staticCountry.flags.png,
+      svg: staticCountry.flags.svg,
+    },
+    cca2: staticCountry.cca2
+  });
+
+  // Use fallback countries
+  const useFallbackCountries = () => {
+    console.log('Using fallback country data');
+    const fallbackCountriesApi = FALLBACK_COUNTRIES.map(convertStaticToApiFormat);
+    setCountries(fallbackCountriesApi);
+    setUsingFallbackData(true);
+  };
+
+  // Fetch countries from REST Countries API with timeout and fallback
   const fetchCountries = async () => {
     if (countries.length > 0) return; // Already fetched
     
     setCountriesLoading(true);
-    setCountriesError(null);
     
     try {
-      const response = await fetch('https://restcountries.com/v3.1/all?fields=name,flags,cca2');
-      if (!response.ok) throw new Error('Failed to fetch countries');
+      console.log('Attempting to fetch countries from API...');
+      
+      // Create fetch with 5-second timeout using AbortController
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch('https://restcountries.com/v3.1/all?fields=name,flags,cca2', {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
       const data: Country[] = await response.json();
+      console.log('Successfully fetched countries from API:', data.length, 'countries');
+      
       // Sort countries alphabetically by common name
       const sortedCountries = data.sort((a, b) => 
         a.name.common.localeCompare(b.name.common)
       );
       setCountries(sortedCountries);
+      setUsingFallbackData(false);
+      
     } catch (error) {
-      console.error('Error fetching countries:', error);
-      setCountriesError('Failed to load countries. You can still type manually.');
+      // Log the actual error for debugging
+      console.error('Error fetching countries from API:', error);
+      console.error('Error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
+      // Silently fall back to static data
+      useFallbackCountries();
     } finally {
       setCountriesLoading(false);
     }
@@ -79,7 +122,15 @@ export default function LeadFinderPage() {
   const handleCountrySelect = (country: Country) => {
     setFormData(prev => ({ ...prev, country: country.name.common }));
     setCountrySearchTerm(country.name.common);
-    setSelectedCountryFlag(country.flags.png);
+    
+    // Use emoji for fallback data, PNG URL for API data
+    if (usingFallbackData) {
+      const fallbackCountry = FALLBACK_COUNTRIES.find(c => c.cca2 === country.cca2);
+      setSelectedCountryFlag(fallbackCountry?.flags.emoji || '🏳️');
+    } else {
+      setSelectedCountryFlag(country.flags.png);
+    }
+    
     setShowCountryDropdown(false);
   };
 
@@ -93,8 +144,14 @@ export default function LeadFinderPage() {
     const matchingCountry = countries.find(country => 
       country.name.common.toLowerCase() === value.toLowerCase()
     );
+    
     if (matchingCountry) {
-      setSelectedCountryFlag(matchingCountry.flags.png);
+      if (usingFallbackData) {
+        const fallbackCountry = FALLBACK_COUNTRIES.find(c => c.cca2 === matchingCountry.cca2);
+        setSelectedCountryFlag(fallbackCountry?.flags.emoji || '🏳️');
+      } else {
+        setSelectedCountryFlag(matchingCountry.flags.png);
+      }
     }
   };
 
@@ -157,7 +214,7 @@ export default function LeadFinderPage() {
                 </label>
                 <div className="relative">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-2 z-10">
-                    {selectedCountryFlag.startsWith('http') ? (
+                    {selectedCountryFlag.startsWith('http') && !usingFallbackData ? (
                       <img 
                         src={selectedCountryFlag} 
                         alt="Flag" 
@@ -195,11 +252,7 @@ export default function LeadFinderPage() {
                       ref={countryDropdownRef}
                       className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto z-20"
                     >
-                      {countriesError ? (
-                        <div className="p-3 text-sm text-red-600">
-                          {countriesError}
-                        </div>
-                      ) : countriesLoading ? (
+                      {countriesLoading ? (
                         <div className="p-3 text-sm text-gray-500 flex items-center gap-2">
                           <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="4"></circle>
@@ -212,24 +265,40 @@ export default function LeadFinderPage() {
                           No countries found matching "{countrySearchTerm}"
                         </div>
                       ) : (
-                        filteredCountries.map((country) => (
-                          <button
-                            key={country.cca2}
-                            type="button"
-                            onClick={() => handleCountrySelect(country)}
-                            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
-                          >
-                            <img 
-                              src={country.flags.png} 
-                              alt={`Flag of ${country.name.common}`}
-                              className="w-5 h-4 object-cover rounded-sm shrink-0"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = 'none';
-                              }}
-                            />
-                            <span className="text-gray-900">{country.name.common}</span>
-                          </button>
-                        ))
+                        <>
+                          {usingFallbackData && (
+                            <div className="p-2 text-xs text-blue-600 bg-blue-50 border-b border-blue-100">
+                              Using offline country data
+                            </div>
+                          )}
+                          {filteredCountries.map((country) => {
+                            const fallbackCountry = usingFallbackData ? 
+                              FALLBACK_COUNTRIES.find(c => c.cca2 === country.cca2) : null;
+                            
+                            return (
+                              <button
+                                key={country.cca2}
+                                type="button"
+                                onClick={() => handleCountrySelect(country)}
+                                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
+                              >
+                                {usingFallbackData && fallbackCountry ? (
+                                  <span className="text-sm shrink-0">{fallbackCountry.flags.emoji}</span>
+                                ) : (
+                                  <img 
+                                    src={country.flags.png} 
+                                    alt={`Flag of ${country.name.common}`}
+                                    className="w-5 h-4 object-cover rounded-sm shrink-0"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).style.display = 'none';
+                                    }}
+                                  />
+                                )}
+                                <span className="text-gray-900">{country.name.common}</span>
+                              </button>
+                            );
+                          })}
+                        </>
                       )}
                     </div>
                   )}
@@ -343,7 +412,7 @@ export default function LeadFinderPage() {
               <div className="flex justify-between items-center py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-600">Country</span>
                 <span className="text-sm font-medium text-gray-900 flex items-center gap-2">
-                  {selectedCountryFlag.startsWith('http') ? (
+                  {selectedCountryFlag.startsWith('http') && !usingFallbackData ? (
                     <img 
                       src={selectedCountryFlag} 
                       alt="Flag" 

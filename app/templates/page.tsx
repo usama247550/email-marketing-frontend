@@ -1,17 +1,10 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { Template, getTemplates, createTemplate, updateTemplate, deleteTemplate } from '@/lib/api';
 import Topbar from '@/components/dashboard/Topbar';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface Template {
-  id: string;
-  name: string;
-  subject: string;
-  body: string; // stored as HTML from contentEditable
-  lastEdited: string; // ISO date string
-}
 
 interface Variable {
   id: string;
@@ -20,51 +13,6 @@ interface Variable {
 }
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
-
-const INITIAL_TEMPLATES: Template[] = [
-  {
-    id: '1',
-    name: 'Wellness Outreach',
-    subject: 'Website Anfrage für {{companyName}}',
-    body: '<p>Hallo {{firstName}},</p><p>Ich habe Ihre Website gefunden und finde Ihr Angebot sehr interessant. Wir würden gerne mehr über Ihre Dienstleistungen erfahren.</p><p>Mit freundlichen Grüßen,<br>{{senderName}}</p>',
-    lastEdited: '2024-03-15',
-  },
-  {
-    id: '2',
-    name: 'Cold Intro – Tech',
-    subject: 'Quick question about {{companyName}}',
-    body: '<p>Hi {{firstName}},</p><p>I came across {{companyName}} while researching companies in {{city}} and I\'d love to connect. We help businesses like yours grow their customer base through targeted outreach.</p><p>Would you be open to a quick 15-minute call?</p><p>Best,<br>{{senderName}}</p>',
-    lastEdited: '2024-03-13',
-  },
-  {
-    id: '3',
-    name: 'Follow-Up #1',
-    subject: 'Following up — {{companyName}}',
-    body: '<p>Hi {{firstName}},</p><p>I wanted to follow up on my previous email. I noticed you visited our website at {{website}} — happy to answer any questions you might have.</p><p>Looking forward to hearing from you,<br>{{senderName}}</p>',
-    lastEdited: '2024-03-10',
-  },
-  {
-    id: '4',
-    name: 'Restaurant Partnership',
-    subject: 'Partnering with {{companyName}} 🍽️',
-    body: '<p>Hallo {{firstName}},</p><p>Ihr Restaurant in {{city}} hat mich wirklich beeindruckt. Ich würde gerne eine mögliche Zusammenarbeit besprechen.</p><p>Können wir kurz telefonieren?</p><p>Viele Grüße,<br>{{senderName}}</p>',
-    lastEdited: '2024-03-08',
-  },
-  {
-    id: '5',
-    name: 'Re-engagement',
-    subject: "It's been a while, {{firstName}}",
-    body: "<p>Hey {{firstName}},</p><p>It's been a few weeks since we last spoke about {{companyName}}. I wanted to check in and see if now might be a better time to connect.</p><p>We've helped dozens of companies in {{city}} achieve real results — I'd love to share some case studies.</p><p>Cheers,<br>{{senderName}}</p>",
-    lastEdited: '2024-03-05',
-  },
-  {
-    id: '6',
-    name: 'Agency Pitch',
-    subject: 'Growing {{companyName}} with better email marketing',
-    body: '<p>Hi {{firstName}},</p><p>I\'m reaching out because I believe we can help {{companyName}} generate more leads and revenue through targeted email campaigns.</p><p>Feel free to check us out at {{website}}. Let me know if you\'d like a free audit!</p><p>Best regards,<br>{{senderName}}</p>',
-    lastEdited: '2024-03-01',
-  },
-];
 
 const INITIAL_VARIABLES: Variable[] = [
   { id: 'v1', tag: '{{companyName}}', label: 'Company Name' },
@@ -352,8 +300,11 @@ export default function TemplatesPage() {
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null); // null = new
 
   // ── templates list state
-  const [templates, setTemplates] = useState<Template[]>(INITIAL_TEMPLATES);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Template | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // ── composer form state
   const [formName,    setFormName]    = useState('');
@@ -368,6 +319,25 @@ export default function TemplatesPage() {
 
   // ── preview state
   const [showPreview, setShowPreview] = useState(false);
+
+  // Load templates on mount
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
+  const loadTemplates = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const templatesData = await getTemplates();
+      setTemplates(templatesData);
+    } catch (err) {
+      console.error('Error loading templates:', err);
+      setError('Failed to load templates. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -387,43 +357,80 @@ export default function TemplatesPage() {
       editorRef.current.innerHTML = body;
     }
     setView('composer');
+    
+    // Update variables from template if editing
+    if (template?.variables) {
+      const templateVars = template.variables.map((varName, index) => ({
+        id: `v${index + 10}`,
+        tag: `{{${varName}}}`,
+        label: varName.charAt(0).toUpperCase() + varName.slice(1).replace(/([A-Z])/g, ' $1')
+      }));
+      
+      // Merge with initial variables, avoiding duplicates
+      const allVars = [...INITIAL_VARIABLES];
+      templateVars.forEach(tVar => {
+        if (!allVars.some(v => v.tag === tVar.tag)) {
+          allVars.push(tVar);
+        }
+      });
+      setVariables(allVars);
+    }
   }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formName.trim()) return;
 
-    const now = new Date().toISOString().split('T')[0];
+    try {
+      setSaving(true);
+      setError(null);
 
-    if (editingTemplate) {
-      // Update existing
-      setTemplates(prev =>
-        prev.map(t =>
-          t.id === editingTemplate.id
-            ? { ...t, name: formName, subject: formSubject, body: formBody, lastEdited: now }
-            : t
-        )
-      );
-    } else {
-      // Create new
-      const newTemplate: Template = {
-        id: Date.now().toString(),
+      // Extract variables from template content
+      const variableMatches = (formSubject + formBody).match(/\{\{([^}]+)\}\}/g) || [];
+      const extractedVariables = [...new Set(
+        variableMatches.map(match => match.replace(/[{}]/g, ''))
+      )];
+
+      const templateData = {
         name: formName,
         subject: formSubject,
         body: formBody,
-        lastEdited: now,
+        variables: extractedVariables
       };
-      setTemplates(prev => [newTemplate, ...prev]);
-    }
 
-    setView('list');
+      if (editingTemplate) {
+        // Update existing
+        await updateTemplate(editingTemplate._id, templateData);
+      } else {
+        // Create new
+        await createTemplate(templateData);
+      }
+
+      // Refresh templates list
+      await loadTemplates();
+      setView('list');
+    } catch (err) {
+      console.error('Error saving template:', err);
+      setError('Failed to save template. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = (template: Template) => setDeleteTarget(template);
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteTarget) return;
-    setTemplates(prev => prev.filter(t => t.id !== deleteTarget.id));
-    setDeleteTarget(null);
+    
+    try {
+      setError(null);
+      await deleteTemplate(deleteTarget._id);
+      await loadTemplates();
+      setDeleteTarget(null);
+    } catch (err) {
+      console.error('Error deleting template:', err);
+      setError('Failed to delete template. Please try again.');
+      setDeleteTarget(null);
+    }
   };
 
   // ── variable insertion ─────────────────────────────────────────────────────
@@ -475,6 +482,20 @@ export default function TemplatesPage() {
 
   // ── render ─────────────────────────────────────────────────────────────────
 
+  if (loading) {
+    return (
+      <div className="flex flex-col flex-1 min-h-screen bg-gray-50">
+        <Topbar selectedProject="all" onProjectChange={() => {}} />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading templates...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col flex-1 min-h-screen bg-gray-50">
       {/* Modals */}
@@ -514,6 +535,17 @@ export default function TemplatesPage() {
             </button>
           </div>
 
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <svg className="h-5 w-5 text-red-400 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            </div>
+          )}
+
           {/* Table card */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             {templates.length === 0 ? (
@@ -549,7 +581,7 @@ export default function TemplatesPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {templates.map((tpl) => (
-                      <tr key={tpl.id} className="hover:bg-gray-50 transition-colors">
+                      <tr key={tpl._id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm font-medium text-gray-900">{tpl.name}</span>
                         </td>
@@ -557,7 +589,7 @@ export default function TemplatesPage() {
                           <span className="text-sm text-gray-500 truncate block">{tpl.subject}</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatDate(tpl.lastEdited)}
+                          {formatDate(tpl.updatedAt)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1">
@@ -662,15 +694,16 @@ export default function TemplatesPage() {
               <div className="flex items-center gap-3 pt-1">
                 <button
                   onClick={handleSave}
-                  disabled={!formName.trim()}
+                  disabled={!formName.trim() || saving}
                   className="flex items-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors"
                 >
+                  {saving && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
                     <polyline points="17 21 17 13 7 13 7 21" />
                     <polyline points="7 3 7 8 15 8" />
                   </svg>
-                  Save Template
+                  {saving ? 'Saving...' : 'Save Template'}
                 </button>
                 <button
                   onClick={() => setShowPreview(true)}
