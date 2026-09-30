@@ -7,7 +7,7 @@ import Topbar from '@/components/dashboard/Topbar';
 type FormMode = 'edit' | 'create';
 
 export default function SettingsPage() {
-  const [selectedProject, setSelectedProject] = useState<string>('');
+  const [selectedProject, setSelectedProject] = useState<string>('all');
   const [projects, setProjects] = useState<Project[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<FormMode>('edit');
@@ -216,7 +216,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col flex-1 min-h-screen bg-gray-50">
-      <Topbar selectedProject={selectedProject} onProjectChange={handleProjectChange} />
+      <Topbar selectedProject={selectedProject as any} onProjectChange={(id) => handleProjectChange(id as string)} />
       
       <div className="flex-1 px-7 py-6">
         <div className="max-w-4xl">

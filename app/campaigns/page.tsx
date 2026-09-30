@@ -174,19 +174,24 @@ export default function CampaignsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [showMenu, setShowMenu] = useState<string | null>(null);
+  const [campaigns, setCampaigns] = useState<Campaign[]>(MOCK_CAMPAIGNS);
+  
+  // Delete confirmation states
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
 
   const ITEMS_PER_PAGE = 25;
 
   // Filter campaigns by search query
   const filteredCampaigns = useMemo(() => {
-    if (!searchQuery.trim()) return MOCK_CAMPAIGNS;
+    if (!searchQuery.trim()) return campaigns;
     
     const query = searchQuery.toLowerCase();
-    return MOCK_CAMPAIGNS.filter(campaign => 
+    return campaigns.filter(campaign => 
       campaign.name.toLowerCase().includes(query) ||
       campaign.projectName.toLowerCase().includes(query)
     );
-  }, [searchQuery]);
+  }, [searchQuery, campaigns]);
 
   // Pagination calculations
   const totalCampaigns = filteredCampaigns.length;
@@ -219,6 +224,26 @@ export default function CampaignsPage() {
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     setShowMenu(null); // Close any open menus
+  };
+
+  // Delete campaign functions
+  const handleDeleteCampaign = (campaign: Campaign) => {
+    setCampaignToDelete(campaign);
+    setShowDeleteModal(true);
+    setShowMenu(null);
+  };
+
+  const confirmDeleteCampaign = () => {
+    if (campaignToDelete) {
+      setCampaigns(prev => prev.filter(campaign => campaign.id !== campaignToDelete.id));
+      setShowDeleteModal(false);
+      setCampaignToDelete(null);
+    }
+  };
+
+  const cancelDeleteCampaign = () => {
+    setShowDeleteModal(false);
+    setCampaignToDelete(null);
   };
 
   return (
@@ -421,6 +446,16 @@ export default function CampaignsPage() {
                                 >
                                   Duplicate
                                 </button>
+                                <hr className="my-1 border-gray-100" />
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteCampaign(campaign);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                >
+                                  Delete
+                                </button>
                               </div>
                             )}
                           </div>
@@ -487,6 +522,50 @@ export default function CampaignsPage() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && campaignToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Delete Campaign</h2>
+            </div>
+            <div className="p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-600">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-base font-medium text-gray-900 mb-2">
+                    Are you sure you want to delete this campaign?
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-3">
+                    You are about to delete "<strong>{campaignToDelete.name}</strong>". This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={cancelDeleteCampaign}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeleteCampaign}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                >
+                  Delete Campaign
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Click outside to close menu */}
       {showMenu && (

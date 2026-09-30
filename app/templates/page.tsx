@@ -386,9 +386,9 @@ export default function TemplatesPage() {
 
       // Extract variables from template content
       const variableMatches = (formSubject + formBody).match(/\{\{([^}]+)\}\}/g) || [];
-      const extractedVariables = [...new Set(
+      const extractedVariables = Array.from(new Set(
         variableMatches.map(match => match.replace(/[{}]/g, ''))
-      )];
+      ));
 
       const templateData = {
         name: formName,

@@ -130,6 +130,10 @@ export default function LeadsPage() {
   const [columnMappings, setColumnMappings] = useState<Record<string, number>>({});
   const [importStep, setImportStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
   const [batches, setBatches] = useState<Batch[]>(MOCK_BATCHES);
+  
+  // Delete confirmation states
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [batchToDelete, setBatchToDelete] = useState<Batch | null>(null);
 
   const BATCHES_PER_PAGE = 12;
   const LEADS_PER_PAGE = 15;
@@ -303,6 +307,25 @@ export default function LeadsPage() {
     setImportStep('upload');
   };
 
+  // Delete batch functions
+  const handleDeleteBatch = (batch: Batch) => {
+    setBatchToDelete(batch);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteBatch = () => {
+    if (batchToDelete) {
+      setBatches(prev => prev.filter(batch => batch.id !== batchToDelete.id));
+      setShowDeleteModal(false);
+      setBatchToDelete(null);
+    }
+  };
+
+  const cancelDeleteBatch = () => {
+    setShowDeleteModal(false);
+    setBatchToDelete(null);
+  };
+
   const Pagination = ({ currentPage, totalPages, onPageChange }: {
     currentPage: number;
     totalPages: number;
@@ -441,12 +464,27 @@ export default function LeadsPage() {
                           {batch.leadCount} leads
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <button
-                            onClick={() => handleViewBatch(batch)}
-                            className="bg-accent hover:bg-accent-hover text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-                          >
-                            View Leads
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleViewBatch(batch)}
+                              className="bg-accent hover:bg-accent-hover text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                            >
+                              View Leads
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteBatch(batch);
+                              }}
+                              className="text-gray-400 hover:text-red-600 transition-colors p-2"
+                              title="Delete batch"
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="m19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                              </svg>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -570,6 +608,51 @@ export default function LeadsPage() {
         )}
       </div>
 
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && batchToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Delete Batch</h2>
+            </div>
+            <div className="p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-600">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-base font-medium text-gray-900 mb-2">
+                    Are you sure you want to delete this batch and all its leads?
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-3">
+                    You are about to delete "<strong>{batchToDelete.name}</strong>" containing{' '}
+                    <strong>{batchToDelete.leadCount} leads</strong>. This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={cancelDeleteBatch}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeleteBatch}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                >
+                  Delete Batch
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CSV Import Modal */}
       {showImportModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -643,10 +726,15 @@ export default function LeadsPage() {
                         </label>
                         <select
                           value={columnMappings[field] ?? ''}
-                          onChange={(e) => setColumnMappings(prev => ({
-                            ...prev,
-                            [field]: e.target.value ? parseInt(e.target.value) : undefined
-                          }))}
+                          onChange={(e) => {
+                            const newMappings = { ...columnMappings };
+                            if (e.target.value) {
+                              newMappings[field] = parseInt(e.target.value);
+                            } else {
+                              delete newMappings[field];
+                            }
+                            setColumnMappings(newMappings);
+                          }}
                           className="w-48 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
                         >
                           <option value="">-- Select Column --</option>
