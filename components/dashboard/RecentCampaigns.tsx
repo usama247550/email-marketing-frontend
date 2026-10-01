@@ -5,6 +5,7 @@ interface RecentCampaignsProps {
   campaigns: ApiCampaign[];
   iconColors: string[];
   loading?: boolean;
+  showEmptyState?: boolean;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -18,7 +19,9 @@ function daysAgo(dateStr: string): number {
   return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
 }
 
-export default function RecentCampaigns({ campaigns, iconColors, loading = false }: RecentCampaignsProps) {
+export default function RecentCampaigns({ campaigns, iconColors, loading = false, showEmptyState = false }: RecentCampaignsProps) {
+  const isEmpty = campaigns.length === 0 || showEmptyState;
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col">
       <div className="flex items-center justify-between mb-4">
@@ -41,8 +44,15 @@ export default function RecentCampaigns({ campaigns, iconColors, loading = false
             </div>
           ))}
         </div>
-      ) : campaigns.length === 0 ? (
-        <p className="text-sm text-gray-400 py-4 text-center">No campaigns found.</p>
+      ) : isEmpty ? (
+        <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mb-3">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+            <polyline points="22,6 12,13 2,6" />
+          </svg>
+          <p className="text-sm font-medium">No campaigns yet</p>
+          <p className="text-xs text-gray-300 mt-1 text-center">Create your first campaign to start<br />your email marketing journey</p>
+        </div>
       ) : (
         <div className="flex flex-col divide-y divide-gray-50">
           {campaigns.map((c, idx) => {

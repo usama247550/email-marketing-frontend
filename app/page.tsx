@@ -5,12 +5,7 @@ import Topbar from '@/components/dashboard/Topbar';
 import StatsCard from '@/components/dashboard/StatsCard';
 import CampaignChart from '@/components/dashboard/CampaignChart';
 import RecentCampaigns from '@/components/dashboard/RecentCampaigns';
-import {
-  CHART_DATA_BY_PROJECT,
-  STAT_CHANGES_BY_PROJECT,
-  CAMPAIGN_ICON_COLORS,
-} from '@/lib/mockData';
-import type { ProjectId } from '@/lib/mockData';
+import { STAT_CHANGES_BY_PROJECT, CAMPAIGN_ICON_COLORS } from '@/lib/mockData';
 import { fetchDashboardStats } from '@/lib/api';
 import type { ApiStats, ApiCampaign } from '@/lib/api';
 
@@ -32,13 +27,13 @@ const EMPTY_STATS: ApiStats = {
 };
 
 export default function DashboardPage() {
-  const [selectedProject, setSelectedProject] = useState<ProjectId>('all');
+  const [selectedProject, setSelectedProject] = useState<string>('all');
   const [stats, setStats] = useState<ApiStats>(EMPTY_STATS);
   const [recentCampaigns, setRecentCampaigns] = useState<ApiCampaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadDashboard = useCallback(async (project: ProjectId) => {
+  const loadDashboard = useCallback(async (project: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -57,15 +52,47 @@ export default function DashboardPage() {
     loadDashboard(selectedProject);
   }, [selectedProject, loadDashboard]);
 
-  const changes = STAT_CHANGES_BY_PROJECT[selectedProject];
-  const chartData = CHART_DATA_BY_PROJECT[selectedProject];
+  // Use fallback mock changes for now - TODO: get these from backend when trend data is implemented
+  const changes = STAT_CHANGES_BY_PROJECT['all'] || {
+    totalLeadsChange: 0,
+    emailsFoundChange: 0,
+    emailsSentChange: 0,
+    emailsOpenedChange: 0,
+    repliesChange: 0,
+  };
 
   const statCards = [
-    { title: 'Total Leads',    value: stats.totalLeads,    change: changes.totalLeadsChange    },
-    { title: 'Emails Found',   value: stats.emailsFound,   change: changes.emailsFoundChange   },
-    { title: 'Emails Sent',    value: stats.emailsSent,    change: changes.emailsSentChange    },
-    { title: 'Emails Opened',  value: stats.emailsOpened,  change: changes.emailsOpenedChange  },
-    { title: 'Replies',        value: stats.replies,       change: changes.repliesChange       },
+    { 
+      title: 'Total Leads', 
+      value: stats.totalLeads, 
+      change: changes.totalLeadsChange,
+      // Note: Currently shows total across all projects since Lead/Batch models don't have project linking
+      note: selectedProject !== 'all' ? 'Total across all projects (project filtering not yet implemented)' : undefined
+    },
+    { 
+      title: 'Emails Found', 
+      value: stats.emailsFound, 
+      change: changes.emailsFoundChange,
+      note: selectedProject !== 'all' ? 'Total across all projects (project filtering not yet implemented)' : undefined
+    },
+    { 
+      title: 'Emails Sent', 
+      value: stats.emailsSent, 
+      change: changes.emailsSentChange,
+      note: 'Email sending not yet implemented'
+    },
+    { 
+      title: 'Emails Opened', 
+      value: stats.emailsOpened, 
+      change: changes.emailsOpenedChange,
+      note: 'Email tracking not yet implemented'
+    },
+    { 
+      title: 'Replies', 
+      value: stats.replies, 
+      change: changes.repliesChange,
+      note: 'Reply tracking not yet implemented'
+    },
   ];
 
   return (
@@ -119,13 +146,14 @@ export default function DashboardPage() {
         {/* Chart + Recent Campaigns */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
           <div className="lg:col-span-3">
-            <CampaignChart data={chartData} />
+            <CampaignChart data={[]} showEmptyState={true} />
           </div>
           <div className="lg:col-span-2">
             <RecentCampaigns
               campaigns={recentCampaigns}
               iconColors={CAMPAIGN_ICON_COLORS}
               loading={loading}
+              showEmptyState={true}
             />
           </div>
         </div>
