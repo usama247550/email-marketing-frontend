@@ -244,3 +244,118 @@ export async function deleteTemplate(id: string): Promise<void> {
     throw error;
   }
 }
+
+// ── Batch and Lead API functions ──────────────────────────────────────────────
+
+export interface Lead {
+  _id: string;
+  batchId: string;
+  company: string;
+  city: string;
+  website: string;
+  email: string;
+  status: 'Valid' | 'Invalid';
+  createdAt: string;
+}
+
+export interface Batch {
+  _id: string;
+  name: string;
+  source: 'CSV Import' | 'Lead Finder Agent';
+  leadCount: number;
+  createdAt: string;
+}
+
+export interface BatchesResponse {
+  batches: Batch[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+}
+
+export interface LeadsResponse {
+  leads: Lead[];
+  batch: Batch;
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+}
+
+export interface ImportCsvResponse {
+  message: string;
+  batch: Batch;
+  leadsImported: number;
+  validLeads: number;
+  invalidLeads: number;
+}
+
+export async function getBatches(page: number = 1, limit: number = 15): Promise<BatchesResponse> {
+  try {
+    const res = await fetch(`${API_BASE}/api/batches?page=${page}&limit=${limit}`, { 
+      cache: 'no-store' 
+    });
+    if (!res.ok) throw new Error(`Failed to fetch batches: ${res.status}`);
+    const json = await res.json();
+    return json as BatchesResponse;
+  } catch (error) {
+    console.error('Error fetching batches:', error);
+    throw error;
+  }
+}
+
+export async function getBatchLeads(batchId: string, page: number = 1, limit: number = 15): Promise<LeadsResponse> {
+  try {
+    const res = await fetch(`${API_BASE}/api/leads/batch/${batchId}?page=${page}&limit=${limit}`, { 
+      cache: 'no-store' 
+    });
+    if (!res.ok) throw new Error(`Failed to fetch batch leads: ${res.status}`);
+    const json = await res.json();
+    return json as LeadsResponse;
+  } catch (error) {
+    console.error('Error fetching batch leads:', error);
+    throw error;
+  }
+}
+
+export async function deleteBatch(batchId: string): Promise<{ message: string; deletedBatch: Batch; deletedLeadsCount: number }> {
+  try {
+    const res = await fetch(`${API_BASE}/api/batches/${batchId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`Failed to delete batch: ${res.status}`);
+    const json = await res.json();
+    return json;
+  } catch (error) {
+    console.error('Error deleting batch:', error);
+    throw error;
+  }
+}
+
+export async function importCsv(file: File): Promise<ImportCsvResponse> {
+  try {
+    const formData = new FormData();
+    formData.append('csvFile', file);
+
+    const res = await fetch(`${API_BASE}/api/batches/import-csv`, {
+      method: 'POST',
+      body: formData, // Don't set Content-Type header for multipart/form-data
+    });
+    
+    if (!res.ok) throw new Error(`Failed to import CSV: ${res.status}`);
+    const json = await res.json();
+    return json as ImportCsvResponse;
+  } catch (error) {
+    console.error('Error importing CSV:', error);
+    throw error;
+  }
+}
