@@ -66,32 +66,26 @@ export default function DashboardPage() {
       title: 'Total Leads', 
       value: stats.totalLeads, 
       change: changes.totalLeadsChange,
-      // Note: Currently shows total across all projects since Lead/Batch models don't have project linking
-      note: selectedProject !== 'all' ? 'Total across all projects (project filtering not yet implemented)' : undefined
     },
     { 
       title: 'Emails Found', 
       value: stats.emailsFound, 
       change: changes.emailsFoundChange,
-      note: selectedProject !== 'all' ? 'Total across all projects (project filtering not yet implemented)' : undefined
     },
     { 
       title: 'Emails Sent', 
       value: stats.emailsSent, 
       change: changes.emailsSentChange,
-      note: 'Email sending not yet implemented'
     },
     { 
       title: 'Emails Opened', 
       value: stats.emailsOpened, 
       change: changes.emailsOpenedChange,
-      note: 'Email tracking not yet implemented'
     },
     { 
       title: 'Replies', 
       value: stats.replies, 
       change: changes.repliesChange,
-      note: 'Reply tracking not yet implemented'
     },
   ];
 

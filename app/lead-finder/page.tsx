@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Topbar from '@/components/dashboard/Topbar';
 import { FALLBACK_COUNTRIES, type StaticCountry } from '@/lib/countries';
+import { getProjects, type Project } from '@/lib/api';
 
 interface Country {
   name: {
@@ -23,7 +24,13 @@ export default function LeadFinderPage() {
     city: 'Frankfurt',
     niche: 'Wellness Center',
     numberOfLeads: 200,
+    projectId: '', // Add project selection
   });
+
+  // Project state
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProject, setSelectedProject] = useState<string>('all');
+  const [projectsLoading, setProjectsLoading] = useState(true);
 
   const [countries, setCountries] = useState<Country[]>([]);
   const [countriesLoading, setCountriesLoading] = useState(false);
@@ -105,7 +112,21 @@ export default function LeadFinderPage() {
   // Load countries on component mount
   useEffect(() => {
     fetchCountries();
+    fetchProjects();
   }, []);
+
+  const fetchProjects = async () => {
+    try {
+      setProjectsLoading(true);
+      const fetchedProjects = await getProjects();
+      setProjects(fetchedProjects);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      // Keep empty array on error
+    } finally {
+      setProjectsLoading(false);
+    }
+  };
 
   // Filter countries based on search term
   const filteredCountries = countries.filter(country =>
@@ -171,6 +192,12 @@ export default function LeadFinderPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleProjectChange = (projectId: string) => {
+    setSelectedProject(projectId);
+    // Update form data if needed
+    setFormData(prev => ({ ...prev, projectId: projectId === 'all' ? '' : projectId }));
+  };
+
   const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({
       ...prev,
@@ -188,8 +215,8 @@ export default function LeadFinderPage() {
     <div className="flex flex-col flex-1 min-h-screen bg-gray-50">
       {/* Top bar */}
       <Topbar
-        selectedProject="all"
-        onProjectChange={() => {}}
+        selectedProject={selectedProject}
+        onProjectChange={handleProjectChange}
       />
 
       {/* Page content */}
@@ -347,6 +374,26 @@ export default function LeadFinderPage() {
                   max="1000"
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
                 />
+              </div>
+
+              {/* Project field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Project (Optional)
+                </label>
+                <select
+                  value={formData.projectId}
+                  onChange={(e) => handleInputChange('projectId', e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg pl-3 pr-8 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all appearance-none"
+                  disabled={projectsLoading}
+                >
+                  <option value="">No Project</option>
+                  {projects.map((project) => (
+                    <option key={project._id} value={project._id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Find Leads button */}

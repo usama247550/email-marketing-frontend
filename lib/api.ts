@@ -38,9 +38,8 @@ export interface DashboardStatsResponse {
 // ── Fetch helpers ─────────────────────────────────────────────────────────────
 
 export async function fetchDashboardStats(project: string): Promise<DashboardStatsResponse> {
-  // Note: project parameter is ignored for now since Lead/Batch models don't have project linking
-  // When project filtering is implemented in the future, the backend will use this parameter
-  const url = `${API_BASE}/api/dashboard/stats`;
+  const qs = project && project !== 'all' ? `?project=${encodeURIComponent(project)}` : '';
+  const url = `${API_BASE}/api/dashboard/stats${qs}`;
   const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Failed to fetch dashboard stats: ${res.status}`);
   const json = await res.json();
@@ -265,6 +264,7 @@ export interface Batch {
   name: string;
   source: 'CSV Import' | 'Lead Finder Agent';
   leadCount: number;
+  projectId?: { _id: string; name: string } | string;
   createdAt: string;
 }
 

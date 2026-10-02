@@ -2,176 +2,32 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { PROJECTS, type ProjectId } from '@/lib/mockData';
 import Topbar from '@/components/dashboard/Topbar';
+import { 
+  getProjects, 
+  getBatches, 
+  getTemplates,
+  type Project,
+  type Template,
+  type Batch,
+  type Lead
+} from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface Project {
-  id: string;
-  name: string;
-  senderEmail: string;
+interface BatchWithLeads extends Batch {
+  validLeadCount: number;
 }
 
-interface Lead {
-  id: string;
-  company: string;
-  city: string;
-  website: string;
-  email: string;
-  status: 'Valid' | 'Invalid';
-}
-
-interface Batch {
-  id: string;
+interface CampaignRequest {
   name: string;
-  source: 'CSV Import' | 'Agent';
-  date: string;
-  leadCount: number;
-  leads: Lead[];
-}
-
-interface Template {
-  id: string;
-  name: string;
-  subject: string;
-  body: string;
+  projectId: string;
+  templateId: string;
+  batchIds: string[];
 }
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
-const MOCK_PROJECTS: Project[] = [
-  { id: 'arswift', name: 'Arswift', senderEmail: 'hello@arswift.com' },
-  { id: 'goldsilver', name: 'Goldsilver.de', senderEmail: 'info@goldsilver.de' },
-  { id: 'anticellulite', name: 'Cellulite-Anticellulite', senderEmail: 'support@anticellulite.com' },
-];
-
-const MOCK_BATCHES: Batch[] = [
-  {
-    id: '1',
-    name: 'Frankfurt - Wellness Center',
-    source: 'Agent',
-    date: '2024-03-15',
-    leadCount: 45,
-    leads: Array.from({ length: 45 }, (_, i) => ({
-      id: `1-${i + 1}`,
-      company: `Wellness Corp ${i + 1}`,
-      city: 'Frankfurt',
-      website: `https://wellness${i + 1}.de`,
-      email: `contact@wellness${i + 1}.de`,
-      status: Math.random() > 0.3 ? 'Valid' : 'Invalid' as 'Valid' | 'Invalid'
-    }))
-  },
-  {
-    id: '2',
-    name: 'berlin_restaurants.csv',
-    source: 'CSV Import',
-    date: '2024-03-14',
-    leadCount: 120,
-    leads: Array.from({ length: 120 }, (_, i) => ({
-      id: `2-${i + 1}`,
-      company: `Restaurant ${i + 1}`,
-      city: 'Berlin',
-      website: `https://restaurant${i + 1}.de`,
-      email: `info@restaurant${i + 1}.de`,
-      status: Math.random() > 0.25 ? 'Valid' : 'Invalid' as 'Valid' | 'Invalid'
-    }))
-  },
-  {
-    id: '3',
-    name: 'Munich - Tech Startups',
-    source: 'Agent',
-    date: '2024-03-13',
-    leadCount: 78,
-    leads: Array.from({ length: 78 }, (_, i) => ({
-      id: `3-${i + 1}`,
-      company: `TechStart ${i + 1}`,
-      city: 'Munich',
-      website: `https://techstart${i + 1}.com`,
-      email: `hello@techstart${i + 1}.com`,
-      status: Math.random() > 0.2 ? 'Valid' : 'Invalid' as 'Valid' | 'Invalid'
-    }))
-  },
-  {
-    id: '4',
-    name: 'healthcare_providers.csv',
-    source: 'CSV Import',
-    date: '2024-03-12',
-    leadCount: 95,
-    leads: Array.from({ length: 95 }, (_, i) => ({
-      id: `4-${i + 1}`,
-      company: `Health Plus ${i + 1}`,
-      city: 'Hamburg',
-      website: `https://health${i + 1}.de`,
-      email: `contact@health${i + 1}.de`,
-      status: Math.random() > 0.35 ? 'Valid' : 'Invalid' as 'Valid' | 'Invalid'
-    }))
-  },
-  {
-    id: '5',
-    name: 'Cologne - Marketing Agencies',
-    source: 'Agent',
-    date: '2024-03-11',
-    leadCount: 62,
-    leads: Array.from({ length: 62 }, (_, i) => ({
-      id: `5-${i + 1}`,
-      company: `Marketing Pro ${i + 1}`,
-      city: 'Cologne',
-      website: `https://marketing${i + 1}.de`,
-      email: `team@marketing${i + 1}.de`,
-      status: Math.random() > 0.3 ? 'Valid' : 'Invalid' as 'Valid' | 'Invalid'
-    }))
-  },
-  // Generate more batches...
-  ...Array.from({ length: 15 }, (_, i) => ({
-    id: `${i + 6}`,
-    name: i % 2 === 0 ? `leads_batch_${i + 6}.csv` : `${['Stuttgart', 'Düsseldorf', 'Leipzig', 'Nuremberg', 'Dresden'][i % 5]} - ${['Fitness', 'Consulting', 'E-commerce', 'Real Estate', 'Education'][i % 5]}`,
-    source: (i % 2 === 0 ? 'CSV Import' : 'Agent') as 'CSV Import' | 'Agent',
-    date: new Date(Date.now() - (i + 6) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    leadCount: Math.floor(Math.random() * 150) + 20,
-    leads: Array.from({ length: Math.floor(Math.random() * 150) + 20 }, (_, j) => ({
-      id: `${i + 6}-${j + 1}`,
-      company: `Company ${j + 1}`,
-      city: ['Stuttgart', 'Düsseldorf', 'Leipzig', 'Nuremberg', 'Dresden'][i % 5],
-      website: `https://company${j + 1}.com`,
-      email: `info@company${j + 1}.com`,
-      status: Math.random() > 0.3 ? 'Valid' : 'Invalid' as 'Valid' | 'Invalid'
-    }))
-  }))
-];
-
-const MOCK_TEMPLATES: Template[] = [
-  {
-    id: '1',
-    name: 'Wellness Outreach',
-    subject: 'Website Anfrage für {{companyName}}',
-    body: '<p>Hallo {{firstName}},</p><p>Ich habe Ihre Website gefunden und finde Ihr Angebot sehr interessant. Wir würden gerne mehr über Ihre Dienstleistungen erfahren.</p><p>Mit freundlichen Grüßen,<br>{{senderName}}</p>',
-  },
-  {
-    id: '2',
-    name: 'Cold Intro – Tech',
-    subject: 'Quick question about {{companyName}}',
-    body: '<p>Hi {{firstName}},</p><p>I came across {{companyName}} while researching companies in {{city}} and I\'d love to connect. We help businesses like yours grow their customer base through targeted outreach.</p><p>Would you be open to a quick 15-minute call?</p><p>Best,<br>{{senderName}}</p>',
-  },
-  {
-    id: '3',
-    name: 'Follow-Up #1',
-    subject: 'Following up — {{companyName}}',
-    body: '<p>Hi {{firstName}},</p><p>I wanted to follow up on my previous email. I noticed you visited our website at {{website}} — happy to answer any questions you might have.</p><p>Looking forward to hearing from you,<br>{{senderName}}</p>',
-  },
-  {
-    id: '4',
-    name: 'Restaurant Partnership',
-    subject: 'Partnering with {{companyName}} 🍽️',
-    body: '<p>Hallo {{firstName}},</p><p>Ihr Restaurant in {{city}} hat mich wirklich beeindruckt. Ich würde gerne eine mögliche Zusammenarbeit besprechen.</p><p>Können wir kurz telefonieren?</p><p>Viele Grüße,<br>{{senderName}}</p>',
-  },
-  {
-    id: '5',
-    name: 'Re-engagement',
-    subject: "It's been a while, {{firstName}}",
-    body: "<p>Hey {{firstName}},</p><p>It's been a few weeks since we last spoke about {{companyName}}. I wanted to check in and see if now might be a better time to connect.</p><p>We've helped dozens of companies in {{city}} achieve real results — I'd love to share some case studies.</p><p>Cheers,<br>{{senderName}}</p>",
-  },
-];
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function SendingPage() {
@@ -179,36 +35,107 @@ export default function SendingPage() {
   const viewCampaignId = searchParams.get('view'); // Check if we're viewing an existing campaign
   const isViewMode = !!viewCampaignId;
   
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [selectedBatches, setSelectedBatches] = useState<Batch[]>([]);
+  const [selectedBatches, setSelectedBatches] = useState<BatchWithLeads[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  
+  // API data states
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [batches, setBatches] = useState<BatchWithLeads[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Load real data from APIs
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const [projectsData, templatesData] = await Promise.all([
+          getProjects(),
+          getTemplates()
+        ]);
+        
+        setProjects(projectsData);
+        setTemplates(templatesData);
+        
+      } catch (err: any) {
+        console.error('Failed to load data:', err);
+        setError(err.message || 'Failed to load data');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
+  }, []);
+
+  // Load batches when selected project changes
+  useEffect(() => {
+    if (selectedProject) {
+      loadBatches(selectedProject._id);
+    } else {
+      setBatches([]);
+    }
+  }, [selectedProject]);
+
+  // Update selected project when projectId changes
+  useEffect(() => {
+    if (selectedProjectId === 'all') {
+      setSelectedProject(null);
+    } else {
+      const project = projects.find(p => p._id === selectedProjectId);
+      setSelectedProject(project || null);
+    }
+  }, [selectedProjectId, projects]);
+
+  const handleProjectChange = (projectId: string) => {
+    setSelectedProjectId(projectId);
+    // Clear selected batches when project changes
+    setSelectedBatches([]);
+  };
+
+  const loadBatches = async (projectId: string) => {
+    try {
+      const queryParams = new URLSearchParams();
+      queryParams.set('page', '1');
+      queryParams.set('limit', '100'); // Get all batches for the project
+      queryParams.set('projectId', projectId);
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/batches?${queryParams}`, {
+        cache: 'no-store'
+      });
+      
+      if (!response.ok) throw new Error(`Failed to fetch batches: ${response.status}`);
+      const data = await response.json();
+      
+      // Convert batches and calculate valid leads count for each
+      const batchesWithValidCount: BatchWithLeads[] = data.batches.map((batch: Batch) => ({
+        ...batch,
+        validLeadCount: batch.leadCount // For now, assume all leads are valid since we don't have detailed lead data
+      }));
+      
+      setBatches(batchesWithValidCount);
+      
+    } catch (err: any) {
+      console.error('Failed to load batches:', err);
+      // Don't set error state here to avoid disrupting the flow
+    }
+  };
   
   // Load campaign data if in view mode
   useEffect(() => {
-    if (isViewMode && viewCampaignId) {
-      // Mock data for viewing a campaign - in real app this would come from API
-      const mockCampaignData = {
-        '1': {
-          project: MOCK_PROJECTS[0], // Arswift
-          batches: [MOCK_BATCHES[0]], // Frankfurt - Wellness Center
-          template: MOCK_TEMPLATES[0], // Wellness Outreach
-        },
-        '2': {
-          project: MOCK_PROJECTS[1], // Goldsilver.de
-          batches: [MOCK_BATCHES[1]], // berlin_restaurants.csv
-          template: MOCK_TEMPLATES[1], // Cold Intro – Tech
-        },
-        // Add more mock campaign data as needed
-      };
-
-      const campaignData = mockCampaignData[viewCampaignId as keyof typeof mockCampaignData];
-      if (campaignData) {
-        setSelectedProject(campaignData.project);
-        setSelectedBatches(campaignData.batches);
-        setSelectedTemplate(campaignData.template);
-      }
+    if (isViewMode && viewCampaignId && !loading) {
+      // TODO: In a real app, this would come from getCampaignById API
+      // For now, just use the first available data as placeholder
+      if (projects.length > 0) setSelectedProject(projects[0]);
+      if (batches.length > 0) setSelectedBatches([batches[0]]);
+      if (templates.length > 0) setSelectedTemplate(templates[0]);
     }
-  }, [isViewMode, viewCampaignId]);
+  }, [isViewMode, viewCampaignId, loading, projects, batches, templates]);
 
   // Modal states
   const [showProjectModal, setShowProjectModal] = useState(false);
@@ -220,28 +147,31 @@ export default function SendingPage() {
   // Search states
   const [batchSearch, setBatchSearch] = useState('');
   const [templateSearch, setTemplateSearch] = useState('');
+  
+  // Sending states
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<{ sentCount: number; totalRecipients: number } | null>(null);
 
-  // Filter batches by search
-  const filteredBatches = MOCK_BATCHES.filter(batch =>
+  // Filter batches by search (sorted newest first)
+  const filteredBatches = batches.filter(batch =>
     batch.name.toLowerCase().includes(batchSearch.toLowerCase())
-  ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // Filter templates by search
-  const filteredTemplates = MOCK_TEMPLATES.filter(template =>
+  const filteredTemplates = templates.filter(template =>
     template.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
     template.subject.toLowerCase().includes(templateSearch.toLowerCase())
   );
 
-  // Calculate valid leads count
+  // Calculate valid leads count (for now, assuming all leads in selected batches are valid)
   const getTotalValidLeads = () => {
     return selectedBatches.reduce((total, batch) => {
-      const validLeads = batch.leads.filter(lead => lead.status === 'Valid').length;
-      return total + validLeads;
+      return total + batch.validLeadCount;
     }, 0);
   };
 
   // Check if ready to send
-  const canSend = selectedProject && selectedBatches.length > 0 && selectedTemplate;
+  const canSend = selectedProject && selectedBatches.length > 0 && selectedTemplate && !sending;
 
   // Format date helper
   const formatDate = (dateString: string) => {
@@ -256,36 +186,76 @@ export default function SendingPage() {
   const replaceVariables = (text: string) => {
     return text
       .replace(/\{\{companyName\}\}/g, 'Example Corp')
+      .replace(/\{\{company\}\}/g, 'Example Corp')
       .replace(/\{\{firstName\}\}/g, 'John')
+      .replace(/\{\{name\}\}/g, 'John')
       .replace(/\{\{city\}\}/g, 'Berlin')
       .replace(/\{\{website\}\}/g, 'https://example.com')
-      .replace(/\{\{senderName\}\}/g, selectedProject?.name || 'Your Name');
+      .replace(/\{\{senderName\}\}/g, selectedProject?.senderName || selectedProject?.name || 'Your Name');
   };
 
   // Handle batch selection
-  const handleBatchToggle = (batch: Batch) => {
+  const handleBatchToggle = (batch: BatchWithLeads) => {
     setSelectedBatches(prev => {
-      const isSelected = prev.some(b => b.id === batch.id);
+      const isSelected = prev.some(b => b._id === batch._id);
       if (isSelected) {
-        return prev.filter(b => b.id !== batch.id);
+        return prev.filter(b => b._id !== batch._id);
       } else {
         return [...prev, batch];
       }
     });
   };
 
-  // Handle send confirmation
-  const handleSend = () => {
-    setShowConfirmModal(false);
-    setShowSuccessModal(true);
+  // Handle send confirmation and actual sending
+  const handleSend = async () => {
+    if (!selectedProject || !selectedTemplate || selectedBatches.length === 0) return;
     
-    // Reset state after showing success
-    setTimeout(() => {
-      setSelectedProject(null);
-      setSelectedBatches([]);
-      setSelectedTemplate(null);
-      setShowSuccessModal(false);
-    }, 2000);
+    setShowConfirmModal(false);
+    setSending(true);
+
+    try {
+      const campaignData: CampaignRequest = {
+        name: `Campaign - ${selectedTemplate.name} - ${new Date().toLocaleDateString()}`,
+        projectId: selectedProject._id,
+        templateId: selectedTemplate._id,
+        batchIds: selectedBatches.map(batch => batch._id)
+      };
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/campaigns`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(campaignData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to send campaign');
+      }
+
+      const result = await response.json();
+      setSendResult({
+        sentCount: result.data.sentCount,
+        totalRecipients: result.data.totalRecipients
+      });
+      setShowSuccessModal(true);
+
+      // Reset state after showing success
+      setTimeout(() => {
+        setSelectedProject(null);
+        setSelectedBatches([]);
+        setSelectedTemplate(null);
+        setShowSuccessModal(false);
+        setSendResult(null);
+      }, 3000);
+
+    } catch (err: any) {
+      console.error('Campaign send error:', err);
+      setError(err.message);
+    } finally {
+      setSending(false);
+    }
   };
 
   // Success icon component
@@ -294,9 +264,10 @@ export default function SendingPage() {
       <polyline points="20 6 9 17 4 12" />
     </svg>
   );
+
   return (
     <div className="flex flex-col flex-1 min-h-screen bg-gray-50">
-      <Topbar selectedProject="all" onProjectChange={() => {}} />
+      <Topbar selectedProject={selectedProjectId} onProjectChange={handleProjectChange} />
       
       <div className="flex-1 px-7 py-6">
         <div className="max-w-4xl">
@@ -313,20 +284,53 @@ export default function SendingPage() {
             {!isViewMode && (
               <button
                 onClick={() => setShowConfirmModal(true)}
-                disabled={!canSend}
+                disabled={!canSend || sending}
                 className={`px-6 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
-                  canSend
+                  canSend && !sending
                     ? 'bg-gray-900 hover:bg-gray-800 text-white'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
               >
-                Send Now
+                {sending ? 'Sending...' : 'Send Now'}
               </button>
             )}
           </div>
 
-          {/* Stacked Sections */}
-          <div className="bg-white rounded-xl border border-gray-100 divide-y divide-gray-100">
+          {/* Error banner */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-600 mr-2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <span className="text-red-700 text-sm">{error}</span>
+                <button 
+                  onClick={() => setError(null)}
+                  className="ml-auto text-red-600 hover:text-red-800"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Loading state */}
+          {loading ? (
+            <div className="bg-white rounded-xl border border-gray-100 p-8 text-center">
+              <div className="animate-pulse">
+                <div className="w-8 h-8 bg-gray-200 rounded-full mx-auto mb-4"></div>
+                <div className="text-sm text-gray-500">Loading campaign data...</div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Stacked Sections */}
+              <div className="bg-white rounded-xl border border-gray-100 divide-y divide-gray-100">
             {/* Project Section */}
             <div className="p-6 flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -430,9 +434,10 @@ export default function SendingPage() {
                 {isViewMode ? 'View template' : 'Choose template'}
               </button>
             </div>
-          </div>
-          {/* Email Preview */}
-          <div className="mt-8 bg-white rounded-xl border border-gray-100 p-6">
+              </div>
+              
+              {/* Email Preview */}
+              <div className="mt-8 bg-white rounded-xl border border-gray-100 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Preview</h3>
             {selectedTemplate ? (
               <div className="border border-gray-200 rounded-lg overflow-hidden max-w-md mx-auto">
@@ -484,19 +489,28 @@ export default function SendingPage() {
                   </button>
                 </div>
                 <div className="space-y-2">
-                  {MOCK_PROJECTS.map((project) => (
-                    <button
-                      key={project.id}
-                      onClick={() => {
-                        setSelectedProject(project);
-                        setShowProjectModal(false);
-                      }}
-                      className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-accent hover:bg-accent/5 transition-all"
-                    >
-                      <div className="font-medium text-gray-900">{project.name}</div>
-                      <div className="text-sm text-gray-500">{project.senderEmail}</div>
-                    </button>
-                  ))}
+                  {projects.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p className="text-sm">No projects found</p>
+                      <p className="text-xs mt-1">Create a project in Settings first</p>
+                    </div>
+                  ) : (
+                    projects.map((project) => (
+                      <button
+                        key={project._id}
+                        onClick={() => {
+                          const newProjectId = project._id;
+                          setSelectedProjectId(newProjectId);
+                          setSelectedProject(project);
+                          setShowProjectModal(false);
+                        }}
+                        className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-accent hover:bg-accent/5 transition-all"
+                      >
+                        <div className="font-medium text-gray-900">{project.name}</div>
+                        <div className="text-sm text-gray-500">{project.senderEmail}</div>
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -531,41 +545,47 @@ export default function SendingPage() {
 
                 {/* Batch list */}
                 <div className="flex-1 overflow-y-auto space-y-2 max-h-96">
-                  {filteredBatches.map((batch) => {
-                    const isSelected = selectedBatches.some(b => b.id === batch.id);
-                    const validLeadsCount = batch.leads.filter(lead => lead.status === 'Valid').length;
-                    
-                    return (
-                      <label
-                        key={batch.id}
-                        className="flex items-center p-3 border border-gray-200 rounded-lg hover:border-accent hover:bg-accent/5 cursor-pointer transition-all"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => handleBatchToggle(batch)}
-                          className="mr-3 w-4 h-4 text-accent focus:ring-accent border-gray-300 rounded"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <div className="font-medium text-gray-900">{batch.name}</div>
-                            <div className="flex items-center gap-2">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                batch.source === 'Agent' 
-                                  ? 'bg-blue-100 text-blue-800' 
-                                  : 'bg-green-100 text-green-800'
-                              }`}>
-                                {batch.source}
-                              </span>
+                  {filteredBatches.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p className="text-sm">No batches found</p>
+                      <p className="text-xs mt-1">Import some leads first</p>
+                    </div>
+                  ) : (
+                    filteredBatches.map((batch) => {
+                      const isSelected = selectedBatches.some(b => b._id === batch._id);
+                      
+                      return (
+                        <label
+                          key={batch._id}
+                          className="flex items-center p-3 border border-gray-200 rounded-lg hover:border-accent hover:bg-accent/5 cursor-pointer transition-all"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleBatchToggle(batch)}
+                            className="mr-3 w-4 h-4 text-accent focus:ring-accent border-gray-300 rounded"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <div className="font-medium text-gray-900">{batch.name}</div>
+                              <div className="flex items-center gap-2">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  batch.source === 'Lead Finder Agent' 
+                                    ? 'bg-blue-100 text-blue-800' 
+                                    : 'bg-green-100 text-green-800'
+                                }`}>
+                                  {batch.source}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-sm text-gray-500 mt-1">
+                              {formatDate(batch.createdAt)} • {batch.validLeadCount} valid leads of {batch.leadCount} total
                             </div>
                           </div>
-                          <div className="text-sm text-gray-500 mt-1">
-                            {formatDate(batch.date)} • {validLeadsCount} valid leads of {batch.leadCount} total
-                          </div>
-                        </div>
-                      </label>
-                    );
-                  })}
+                        </label>
+                      );
+                    })
+                  )}
                 </div>
 
                 {/* Done button */}
@@ -610,19 +630,26 @@ export default function SendingPage() {
 
                 {/* Template list */}
                 <div className="flex-1 overflow-y-auto space-y-2 max-h-96">
-                  {filteredTemplates.map((template) => (
-                    <button
-                      key={template.id}
-                      onClick={() => {
-                        setSelectedTemplate(template);
-                        setShowTemplateModal(false);
-                      }}
-                      className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-accent hover:bg-accent/5 transition-all"
-                    >
-                      <div className="font-medium text-gray-900">{template.name}</div>
-                      <div className="text-sm text-gray-500 mt-1 truncate">{template.subject}</div>
-                    </button>
-                  ))}
+                  {filteredTemplates.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p className="text-sm">No templates found</p>
+                      <p className="text-xs mt-1">Create some templates first</p>
+                    </div>
+                  ) : (
+                    filteredTemplates.map((template) => (
+                      <button
+                        key={template._id}
+                        onClick={() => {
+                          setSelectedTemplate(template);
+                          setShowTemplateModal(false);
+                        }}
+                        className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-accent hover:bg-accent/5 transition-all"
+                      >
+                        <div className="font-medium text-gray-900">{template.name}</div>
+                        <div className="text-sm text-gray-500 mt-1 truncate">{template.subject}</div>
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -692,11 +719,16 @@ export default function SendingPage() {
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Campaign Started!</h3>
                 <p className="text-gray-600 mb-4">
-                  {getTotalValidLeads()} emails queued for sending
+                  {sendResult ? 
+                    `${sendResult.sentCount} of ${sendResult.totalRecipients} emails sent successfully` :
+                    `${getTotalValidLeads()} emails queued for sending`
+                  }
                 </p>
                 <div className="w-8 h-1 bg-green-600 rounded mx-auto"></div>
               </div>
             </div>
+          )}
+            </>
           )}
         </div>
       </div>

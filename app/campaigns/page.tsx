@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Topbar from '@/components/dashboard/Topbar';
+import { fetchCampaigns, getProjects, type ApiCampaign, type Project } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,154 +20,6 @@ interface Campaign {
   unsubscribeRate: number; // percentage
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const MOCK_CAMPAIGNS: Campaign[] = [
-  {
-    id: '1',
-    name: 'Weekly Wellness Newsletter #47',
-    projectId: 'arswift',
-    projectName: 'Arswift',
-    sentDate: '2024-03-20T13:11:00',
-    recipients: 485,
-    opens: 127,
-    openRate: 26.2,
-    unsubscribed: 3,
-    unsubscribeRate: 0.6,
-  },
-  {
-    id: '2',
-    name: 'Gold Investment Opportunity',
-    projectId: 'goldsilver',
-    projectName: 'Goldsilver.de',
-    sentDate: '2024-03-19T09:45:00',
-    recipients: 312,
-    opens: 89,
-    openRate: 28.5,
-    unsubscribed: 5,
-    unsubscribeRate: 1.6,
-  },
-  {
-    id: '3',
-    name: 'Summer Skin Care Tips',
-    projectId: 'anticellulite',
-    projectName: 'Cellulite-Anticellulite',
-    sentDate: '2024-03-18T15:30:00',
-    recipients: 267,
-    opens: 78,
-    openRate: 29.2,
-    unsubscribed: 2,
-    unsubscribeRate: 0.7,
-  },
-  {
-    id: '4',
-    name: 'Restaurant Outreach Campaign',
-    projectId: 'arswift',
-    projectName: 'Arswift',
-    sentDate: '2024-03-17T11:22:00',
-    recipients: 156,
-    opens: 45,
-    openRate: 28.8,
-    unsubscribed: 1,
-    unsubscribeRate: 0.6,
-  },
-  {
-    id: '5',
-    name: 'Precious Metals Market Update',
-    projectId: 'goldsilver',
-    projectName: 'Goldsilver.de',
-    sentDate: '2024-03-16T14:15:00',
-    recipients: 428,
-    opens: 134,
-    openRate: 31.3,
-    unsubscribed: 7,
-    unsubscribeRate: 1.6,
-  },
-  {
-    id: '6',
-    name: 'Anti-Cellulite Success Stories',
-    projectId: 'anticellulite',
-    projectName: 'Cellulite-Anticellulite',
-    sentDate: '2024-03-15T10:05:00',
-    recipients: 198,
-    opens: 62,
-    openRate: 31.3,
-    unsubscribed: 1,
-    unsubscribeRate: 0.5,
-  },
-  {
-    id: '7',
-    name: 'Tech Startup Networking Event',
-    projectId: 'arswift',
-    projectName: 'Arswift',
-    sentDate: '2024-03-14T16:40:00',
-    recipients: 89,
-    opens: 24,
-    openRate: 27.0,
-    unsubscribed: 0,
-    unsubscribeRate: 0.0,
-  },
-  {
-    id: '8',
-    name: 'Silver Price Alert - March',
-    projectId: 'goldsilver',
-    projectName: 'Goldsilver.de',
-    sentDate: '2024-03-13T08:30:00',
-    recipients: 356,
-    opens: 98,
-    openRate: 27.5,
-    unsubscribed: 4,
-    unsubscribeRate: 1.1,
-  },
-  {
-    id: '9',
-    name: 'Spring Detox Program Launch',
-    projectId: 'anticellulite',
-    projectName: 'Cellulite-Anticellulite',
-    sentDate: '2024-03-12T12:18:00',
-    recipients: 445,
-    opens: 156,
-    openRate: 35.1,
-    unsubscribed: 8,
-    unsubscribeRate: 1.8,
-  },
-  {
-    id: '10',
-    name: 'Healthcare Provider Outreach',
-    projectId: 'arswift',
-    projectName: 'Arswift',
-    sentDate: '2024-03-11T14:55:00',
-    recipients: 234,
-    opens: 67,
-    openRate: 28.6,
-    unsubscribed: 2,
-    unsubscribeRate: 0.9,
-  },
-  {
-    id: '11',
-    name: 'Gold vs Bitcoin Analysis',
-    projectId: 'goldsilver',
-    projectName: 'Goldsilver.de',
-    sentDate: '2024-03-10T11:12:00',
-    recipients: 512,
-    opens: 189,
-    openRate: 36.9,
-    unsubscribed: 9,
-    unsubscribeRate: 1.8,
-  },
-  {
-    id: '12',
-    name: 'Customer Success Testimonials',
-    projectId: 'anticellulite',
-    projectName: 'Cellulite-Anticellulite',
-    sentDate: '2024-03-09T09:25:00',
-    recipients: 167,
-    opens: 51,
-    openRate: 30.5,
-    unsubscribed: 1,
-    unsubscribeRate: 0.6,
-  },
-];
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function CampaignsPage() {
@@ -174,13 +27,94 @@ export default function CampaignsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [showMenu, setShowMenu] = useState<string | null>(null);
-  const [campaigns, setCampaigns] = useState<Campaign[]>(MOCK_CAMPAIGNS);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  
+  // Project state
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProject, setSelectedProject] = useState<string>('all');
+  
+  // Loading states
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Delete confirmation states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
 
   const ITEMS_PER_PAGE = 25;
+
+  // Load projects and campaigns on component mount
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // Reload campaigns when project filter changes
+  useEffect(() => {
+    if (!loading) {
+      loadCampaigns();
+    }
+  }, [selectedProject]);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const [projectsData] = await Promise.all([
+        getProjects()
+      ]);
+      
+      setProjects(projectsData);
+      await loadCampaigns();
+      
+    } catch (err: any) {
+      console.error('Failed to load data:', err);
+      setError(err.message || 'Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadCampaigns = async () => {
+    try {
+      const campaignProject = selectedProject === 'all' ? undefined : selectedProject;
+      const apiCampaigns = await fetchCampaigns(campaignProject);
+      
+      // Convert API campaigns to frontend format
+      const formattedCampaigns: Campaign[] = apiCampaigns.map((campaign: ApiCampaign) => {
+        const projectName = typeof campaign.projectId === 'object' ? 
+          campaign.projectId.name : 
+          projects.find(p => p._id === campaign.projectId)?.name || 'Unknown Project';
+        
+        const openRate = campaign.sentCount > 0 ? (campaign.openedCount / campaign.sentCount) * 100 : 0;
+        const unsubscribeRate = 0; // We don't have unsubscribe data yet
+        
+        return {
+          id: campaign._id,
+          name: campaign.name,
+          projectId: typeof campaign.projectId === 'object' ? campaign.projectId._id : campaign.projectId,
+          projectName,
+          sentDate: campaign.createdAt, // Use createdAt as sent date
+          recipients: campaign.sentCount,
+          opens: campaign.openedCount,
+          openRate,
+          unsubscribed: 0, // We don't have unsubscribe data yet
+          unsubscribeRate
+        };
+      });
+      
+      setCampaigns(formattedCampaigns);
+      
+    } catch (err: any) {
+      console.error('Failed to load campaigns:', err);
+      setCampaigns([]);
+    }
+  };
+
+  const handleProjectChange = (projectId: string) => {
+    setSelectedProject(projectId);
+    setCurrentPage(1); // Reset to first page when changing project
+  };
 
   // Filter campaigns by search query
   const filteredCampaigns = useMemo(() => {
@@ -248,7 +182,7 @@ export default function CampaignsPage() {
 
   return (
     <div className="flex flex-col flex-1 min-h-screen bg-gray-50">
-      <Topbar selectedProject="all" onProjectChange={() => {}} />
+      <Topbar selectedProject={selectedProject} onProjectChange={handleProjectChange} />
       
       <div className="flex-1 px-7 py-6">
         <div className="max-w-[1400px] w-full mx-auto">
@@ -330,7 +264,30 @@ export default function CampaignsPage() {
           </div>
           {/* Campaigns Table */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            {paginatedCampaigns.length === 0 ? (
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center px-4">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-accent mb-4"></div>
+                <p className="text-sm font-medium text-gray-700">Loading campaigns...</p>
+              </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center px-4">
+                <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center mb-3 text-red-600">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                </div>
+                <p className="text-sm font-medium text-gray-700 mb-1">Error loading campaigns</p>
+                <p className="text-xs text-gray-400 mb-3">{error}</p>
+                <button 
+                  onClick={() => fetchData()}
+                  className="px-4 py-2 bg-accent hover:bg-accent-hover text-white text-sm rounded-lg transition-colors"
+                >
+                  Try Again
+                </button>
+              </div>
+            ) : paginatedCampaigns.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center px-4">
                 <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center mb-3 text-gray-400">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">

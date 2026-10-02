@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Topbar from '@/components/dashboard/Topbar';
-import { getBatches, getBatchLeads, deleteBatch, importCsv, type Batch, type Lead, type BatchesResponse, type LeadsResponse } from '@/lib/api';
+import { getBatches, getBatchLeads, deleteBatch, importCsv, getProjects, type Batch, type Lead, type BatchesResponse, type LeadsResponse, type Project } from '@/lib/api';
 
 // Remove mock data - we'll use real API data now
 
@@ -11,6 +11,11 @@ export default function LeadsPage() {
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   const [batchesPage, setBatchesPage] = useState(1);
   const [leadsPage, setLeadsPage] = useState(1);
+  
+  // Project state
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProject, setSelectedProject] = useState<string>('all');
+  const [projectsLoading, setProjectsLoading] = useState(true);
   
   // API state
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -32,6 +37,7 @@ export default function LeadsPage() {
   const [columnMappings, setColumnMappings] = useState<Record<string, number>>({});
   const [importStep, setImportStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
   const [importing, setImporting] = useState(false);
+  const [importProjectId, setImportProjectId] = useState<string>('');
   
   // Delete confirmation states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -41,10 +47,15 @@ export default function LeadsPage() {
   const BATCHES_PER_PAGE = 12;
   const LEADS_PER_PAGE = 15;
 
-  // Fetch batches on component mount and when page changes
+  // Fetch projects on component mount
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  // Fetch batches on component mount and when page or project changes
   useEffect(() => {
     fetchBatchesData();
-  }, [batchesPage]);
+  }, [batchesPage, selectedProject]);
 
   // Fetch leads when page changes (only if we're in detail view)
   useEffect(() => {
@@ -53,13 +64,42 @@ export default function LeadsPage() {
     }
   }, [leadsPage]);
 
+  const fetchProjects = async () => {
+    try {
+      setProjectsLoading(true);
+      const fetchedProjects = await getProjects();
+      setProjects(fetchedProjects);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      // Keep empty array on error
+    } finally {
+      setProjectsLoading(false);
+    }
+  };
+
   const fetchBatchesData = async () => {
     try {
       setBatchesLoading(true);
       setBatchesError(null);
-      const response = await getBatches(batchesPage, BATCHES_PER_PAGE);
-      setBatches(response.batches);
-      setTotalBatchesPages(response.pagination.totalPages);
+      
+      // Build query parameters
+      const queryParams = new URLSearchParams();
+      queryParams.set('page', batchesPage.toString());
+      queryParams.set('limit', BATCHES_PER_PAGE.toString());
+      
+      if (selectedProject && selectedProject !== 'all') {
+        queryParams.set('projectId', selectedProject);
+      }
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/batches?${queryParams}`, {
+        cache: 'no-store'
+      });
+      
+      if (!response.ok) throw new Error(`Failed to fetch batches: ${response.status}`);
+      const data = await response.json();
+      
+      setBatches(data.batches);
+      setTotalBatchesPages(data.pagination.totalPages);
     } catch (error) {
       setBatchesError(error instanceof Error ? error.message : 'Failed to fetch batches');
     } finally {
@@ -101,6 +141,11 @@ export default function LeadsPage() {
     setBatchesPage(page);
   };
 
+  const handleProjectChange = (projectId: string) => {
+    setSelectedProject(projectId);
+    setBatchesPage(1); // Reset to first page when changing project
+  };
+
   const handleLeadsPageChange = (page: number) => {
     setLeadsPage(page);
     if (selectedBatch) {
@@ -133,19 +178,34 @@ export default function LeadsPage() {
     
     try {
       setImporting(true);
-      const response = await importCsv(selectedFile);
+      
+      // Create FormData with file and projectId
+      const formData = new FormData();
+      formData.append('csvFile', selectedFile);
+      if (importProjectId && importProjectId !== '') {
+        formData.append('projectId', importProjectId);
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/batches/import-csv`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) throw new Error(`Failed to import CSV: ${response.status}`);
+      const data = await response.json();
       
       // Reset modal state
       setShowImportModal(false);
       setSelectedFile(null);
       setImportStep('upload');
+      setImportProjectId('');
       
       // Refresh batches list to show the new batch
       setBatchesPage(1); // Go to first page to see the newest batch
       await fetchBatchesData();
       
       // Show success message
-      alert(`CSV imported successfully! ${response.leadsImported} leads added (${response.validLeads} valid, ${response.invalidLeads} invalid).`);
+      alert(`CSV imported successfully! ${data.leadsImported} leads added (${data.validLeads} valid, ${data.invalidLeads} invalid).`);
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Failed to import CSV file');
     } finally {
@@ -160,6 +220,7 @@ export default function LeadsPage() {
     setCsvHeaders([]);
     setColumnMappings({});
     setImportStep('upload');
+    setImportProjectId('');
   };
 
   // Delete batch functions
@@ -252,8 +313,8 @@ export default function LeadsPage() {
     <div className="flex flex-col flex-1 min-h-screen bg-gray-50">
       {/* Top bar */}
       <Topbar
-        selectedProject="all"
-        onProjectChange={() => {}}
+        selectedProject={selectedProject}
+        onProjectChange={handleProjectChange}
       />
 
       {/* Page content */}
@@ -316,6 +377,9 @@ export default function LeadsPage() {
                             Batch Name
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Project
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Source
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -335,6 +399,14 @@ export default function LeadsPage() {
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm font-medium text-gray-900">
                                 {batch.name}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-500">
+                                {batch.projectId ? 
+                                  (typeof batch.projectId === 'object' ? batch.projectId.name : 'Unknown Project') 
+                                  : 'No Project'
+                                }
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -623,6 +695,27 @@ export default function LeadsPage() {
                     </p>
                   </div>
                 )}
+              </div>
+
+              {/* Project Selection */}
+              <div className="mt-6">
+                <label htmlFor="project-select" className="block text-sm font-medium text-gray-700 mb-2">
+                  Project (Optional)
+                </label>
+                <select
+                  id="project-select"
+                  value={importProjectId}
+                  onChange={(e) => setImportProjectId(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg pl-3 pr-8 py-2 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all appearance-none"
+                  disabled={projectsLoading}
+                >
+                  <option value="">No Project</option>
+                  {projects.map((project) => (
+                    <option key={project._id} value={project._id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {selectedFile && (
