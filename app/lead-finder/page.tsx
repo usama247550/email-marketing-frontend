@@ -52,8 +52,8 @@ export default function LeadFinderPage() {
     cca2: staticCountry.cca2
   });
 
-  // Use fallback countries
-  const useFallbackCountries = () => {
+  // Use fallback countries - moved outside of fetchCountries to fix hooks rule
+  const applyFallbackCountries = () => {
     console.log('Using fallback country data');
     const fallbackCountriesApi = FALLBACK_COUNTRIES.map(convertStaticToApiFormat);
     setCountries(fallbackCountriesApi);
@@ -103,7 +103,7 @@ export default function LeadFinderPage() {
       });
       
       // Silently fall back to static data
-      useFallbackCountries();
+      applyFallbackCountries();
     } finally {
       setCountriesLoading(false);
     }
@@ -289,7 +289,7 @@ export default function LeadFinderPage() {
                         </div>
                       ) : filteredCountries.length === 0 ? (
                         <div className="p-3 text-sm text-gray-500">
-                          No countries found matching "{countrySearchTerm}"
+                          No countries found matching &quot;{countrySearchTerm}&quot;
                         </div>
                       ) : (
                         <>
@@ -417,7 +417,7 @@ export default function LeadFinderPage() {
                       What happens next?
                     </h4>
                     <p className="text-xs text-blue-700 leading-relaxed">
-                      We'll find businesses using TomTom, scrape their websites for emails, 
+                      We&apos;ll find businesses using TomTom, scrape their websites for emails, 
                       and save everything to your leads list. This may take a few minutes.
                     </p>
                   </div>

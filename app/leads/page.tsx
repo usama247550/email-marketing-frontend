@@ -62,7 +62,7 @@ export default function LeadsPage() {
     if (currentView === 'batch-detail' && selectedBatch) {
       fetchLeadsData(selectedBatch._id);
     }
-  }, [leadsPage]);
+  }, [leadsPage, currentView, selectedBatch]);
 
   const fetchProjects = async () => {
     try {
@@ -618,7 +618,7 @@ export default function LeadsPage() {
                     Are you sure you want to delete this batch and all its leads?
                   </h3>
                   <p className="text-sm text-gray-500 mb-3">
-                    You are about to delete "<strong>{batchToDelete.name}</strong>" containing{' '}
+                    You are about to delete &quot;<strong>{batchToDelete.name}</strong>&quot; containing{' '}
                     <strong>{batchToDelete.leadCount} leads</strong>. This action cannot be undone.
                   </p>
                 </div>

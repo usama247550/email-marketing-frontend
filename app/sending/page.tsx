@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Topbar from '@/components/dashboard/Topbar';
 import { 
@@ -30,7 +30,7 @@ interface CampaignRequest {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function SendingPage() {
+function SendingPageContent() {
   const searchParams = useSearchParams();
   const viewCampaignId = searchParams.get('view'); // Check if we're viewing an existing campaign
   const isViewMode = !!viewCampaignId;
@@ -73,31 +73,6 @@ export default function SendingPage() {
     loadData();
   }, []);
 
-  // Load batches when selected project changes
-  useEffect(() => {
-    if (selectedProject) {
-      loadBatches(selectedProject._id);
-    } else {
-      setBatches([]);
-    }
-  }, [selectedProject]);
-
-  // Update selected project when projectId changes
-  useEffect(() => {
-    if (selectedProjectId === 'all') {
-      setSelectedProject(null);
-    } else {
-      const project = projects.find(p => p._id === selectedProjectId);
-      setSelectedProject(project || null);
-    }
-  }, [selectedProjectId, projects]);
-
-  const handleProjectChange = (projectId: string) => {
-    setSelectedProjectId(projectId);
-    // Clear selected batches when project changes
-    setSelectedBatches([]);
-  };
-
   const loadBatches = async (projectId: string) => {
     try {
       const queryParams = new URLSearchParams();
@@ -124,6 +99,31 @@ export default function SendingPage() {
       console.error('Failed to load batches:', err);
       // Don't set error state here to avoid disrupting the flow
     }
+  };
+
+  // Load batches when selected project changes
+  useEffect(() => {
+    if (selectedProject) {
+      loadBatches(selectedProject._id);
+    } else {
+      setBatches([]);
+    }
+  }, [selectedProject]);
+
+  // Update selected project when projectId changes
+  useEffect(() => {
+    if (selectedProjectId === 'all') {
+      setSelectedProject(null);
+    } else {
+      const project = projects.find(p => p._id === selectedProjectId);
+      setSelectedProject(project || null);
+    }
+  }, [selectedProjectId, projects]);
+
+  const handleProjectChange = (projectId: string) => {
+    setSelectedProjectId(projectId);
+    // Clear selected batches when project changes
+    setSelectedBatches([]);
   };
   
   // Load campaign data if in view mode
@@ -733,5 +733,13 @@ export default function SendingPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SendingPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SendingPageContent />
+    </Suspense>
   );
 }

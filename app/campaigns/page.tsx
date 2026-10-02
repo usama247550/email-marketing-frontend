@@ -53,7 +53,7 @@ export default function CampaignsPage() {
     if (!loading) {
       loadCampaigns();
     }
-  }, [selectedProject]);
+  }, [selectedProject, loading, projects]);
 
   const fetchData = async () => {
     try {
@@ -501,7 +501,7 @@ export default function CampaignsPage() {
                     Are you sure you want to delete this campaign?
                   </h3>
                   <p className="text-sm text-gray-500 mb-3">
-                    You are about to delete "<strong>{campaignToDelete.name}</strong>". This action cannot be undone.
+                    You are about to delete &quot;<strong>{campaignToDelete.name}</strong>&quot;. This action cannot be undone.
                   </p>
                 </div>
               </div>

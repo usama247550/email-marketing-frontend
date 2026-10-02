@@ -206,7 +206,7 @@ function DeleteConfirmModal({
           <h3 className="text-base font-semibold text-gray-900">Delete template?</h3>
         </div>
         <p className="text-sm text-gray-500 mb-5">
-          <span className="font-medium text-gray-700">"{templateName}"</span> will be permanently deleted. This action cannot be undone.
+          <span className="font-medium text-gray-700">&quot;{templateName}&quot;</span> will be permanently deleted. This action cannot be undone.
         </p>
         <div className="flex items-center gap-2 justify-end">
           <button
@@ -558,7 +558,7 @@ export default function TemplatesPage() {
                   </svg>
                 </div>
                 <p className="text-sm font-medium text-gray-700 mb-1">No templates yet</p>
-                <p className="text-xs text-gray-400">Click "Create New Template" to get started.</p>
+                <p className="text-xs text-gray-400">Click &quot;Create New Template&quot; to get started.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
