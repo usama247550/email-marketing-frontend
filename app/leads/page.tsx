@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Topbar from '@/components/dashboard/Topbar';
 import { getBatches, getBatchLeads, deleteBatch, importCsv, getProjects, type Batch, type Lead, type BatchesResponse, type LeadsResponse, type Project } from '@/lib/api';
 
@@ -47,25 +47,7 @@ export default function LeadsPage() {
   const BATCHES_PER_PAGE = 12;
   const LEADS_PER_PAGE = 15;
 
-  // Fetch projects on component mount
-  useEffect(() => {
-    fetchProjects();
-  }, []);
-
-  // Fetch batches on component mount and when page or project changes
-  useEffect(() => {
-    fetchBatchesData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [batchesPage, selectedProject]);
-
-  // Fetch leads when page changes (only if we're in detail view)
-  useEffect(() => {
-    if (currentView === 'batch-detail' && selectedBatch) {
-      fetchLeadsData(selectedBatch._id);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leadsPage, currentView, selectedBatch]);
-
+  // Define functions first (before useEffects that reference them)
   const fetchProjects = async () => {
     try {
       setProjectsLoading(true);
@@ -79,7 +61,7 @@ export default function LeadsPage() {
     }
   };
 
-  const fetchBatchesData = async () => {
+  const fetchBatchesData = useCallback(async () => {
     try {
       setBatchesLoading(true);
       setBatchesError(null);
@@ -107,23 +89,40 @@ export default function LeadsPage() {
     } finally {
       setBatchesLoading(false);
     }
-  };
+  }, [batchesPage, selectedProject]);
 
-  const fetchLeadsData = async (batchId: string) => {
+  const fetchLeadsData = useCallback(async (batchId: string) => {
     try {
       setLeadsLoading(true);
       setLeadsError(null);
       const response = await getBatchLeads(batchId, leadsPage, LEADS_PER_PAGE);
       setLeads(response.leads);
       setTotalLeadsPages(response.pagination.totalPages);
-      // Update selected batch with fresh data
+      // Update selected batch with fresh data (this won't cause infinite loop now)
       setSelectedBatch(response.batch);
     } catch (error) {
       setLeadsError(error instanceof Error ? error.message : 'Failed to fetch leads');
     } finally {
       setLeadsLoading(false);
     }
-  };
+  }, [leadsPage]);
+
+  // Fetch projects on component mount
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  // Fetch batches on component mount and when page or project changes
+  useEffect(() => {
+    fetchBatchesData();
+  }, [fetchBatchesData]);
+
+  // Fetch leads when page changes (only if we're in detail view)
+  useEffect(() => {
+    if (currentView === 'batch-detail' && selectedBatch) {
+      fetchLeadsData(selectedBatch._id);
+    }
+  }, [leadsPage, currentView, selectedBatch?._id, fetchLeadsData]); // Use selectedBatch?._id instead of selectedBatch
 
   const handleViewBatch = (batch: Batch) => {
     setSelectedBatch(batch);
@@ -150,9 +149,7 @@ export default function LeadsPage() {
 
   const handleLeadsPageChange = (page: number) => {
     setLeadsPage(page);
-    if (selectedBatch) {
-      fetchLeadsData(selectedBatch._id);
-    }
+    // fetchLeadsData will be called automatically by the useEffect when leadsPage changes
   };
 
   const formatDate = (dateString: string) => {

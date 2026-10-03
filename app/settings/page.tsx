@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Project, getProjects, createProject, updateProject, deleteProject } from '@/lib/api';
+import { Project, getProjects, createProject, updateProject, deleteProject, EmailApiAccount, getEmailApiAccounts, createEmailApiAccount, updateEmailApiAccount, deleteEmailApiAccount } from '@/lib/api';
 import Topbar from '@/components/dashboard/Topbar';
 
 type FormMode = 'edit' | 'create';
@@ -15,6 +15,20 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   
+  // Email API Accounts state
+  const [emailApiAccounts, setEmailApiAccounts] = useState<EmailApiAccount[]>([]);
+  const [apiAccountsLoading, setApiAccountsLoading] = useState(true);
+  const [showApiAccountModal, setShowApiAccountModal] = useState(false);
+  const [apiAccountFormMode, setApiAccountFormMode] = useState<'create' | 'edit'>('create');
+  const [editingApiAccount, setEditingApiAccount] = useState<EmailApiAccount | null>(null);
+  const [apiAccountForm, setApiAccountForm] = useState({
+    name: '',
+    provider: 'brevo' as const,
+    apiKey: ''
+  });
+  const [apiAccountSaving, setApiAccountSaving] = useState(false);
+  const [showApiAccountDeleteConfirm, setShowApiAccountDeleteConfirm] = useState<string | null>(null);
+  
   // Single form state
   const [formData, setFormData] = useState({
     name: '',
@@ -26,11 +40,14 @@ export default function SettingsPage() {
     smtpPort: 465,
     smtpUser: '',
     smtpPassword: '',
+    sendingMethod: 'brevo_api' as 'smtp' | 'brevo_api',
+    emailApiAccountId: '',
   });
 
   // Load projects on component mount
   useEffect(() => {
     loadProjects();
+    loadEmailApiAccounts();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -49,6 +66,8 @@ export default function SettingsPage() {
           smtpPort: project.smtpPort,
           smtpUser: project.smtpUser || '',
           smtpPassword: project.smtpPassword || '',
+          sendingMethod: project.sendingMethod || 'brevo_api',
+          emailApiAccountId: project.emailApiAccountId || '',
         });
       }
     }
@@ -73,6 +92,19 @@ export default function SettingsPage() {
     }
   };
 
+  const loadEmailApiAccounts = async () => {
+    try {
+      setApiAccountsLoading(true);
+      const accounts = await getEmailApiAccounts();
+      setEmailApiAccounts(accounts);
+    } catch (err) {
+      console.error('Error loading email API accounts:', err);
+      // Don't show error for API accounts as it's not critical
+    } finally {
+      setApiAccountsLoading(false);
+    }
+  };
+
   const handleProjectChange = (projectId: string) => {
     setSelectedProject(projectId);
   };
@@ -89,6 +121,8 @@ export default function SettingsPage() {
       smtpPort: 465,
       smtpUser: '',
       smtpPassword: '',
+      sendingMethod: 'brevo_api',
+      emailApiAccountId: '',
     });
     // Smooth scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -109,6 +143,8 @@ export default function SettingsPage() {
           smtpPort: project.smtpPort,
           smtpUser: project.smtpUser || '',
           smtpPassword: project.smtpPassword || '',
+          sendingMethod: project.sendingMethod || 'brevo_api',
+          emailApiAccountId: project.emailApiAccountId || '',
         });
       }
     }
@@ -171,6 +207,8 @@ export default function SettingsPage() {
       smtpPort: project.smtpPort,
       smtpUser: project.smtpUser || '',
       smtpPassword: project.smtpPassword || '',
+      sendingMethod: project.sendingMethod || 'brevo_api',
+      emailApiAccountId: project.emailApiAccountId || '',
     });
     
     // Smooth scroll to top
@@ -201,6 +239,78 @@ export default function SettingsPage() {
       setError('Failed to delete project. Please try again.');
       setShowDeleteConfirm(null);
     }
+  };
+
+  // Email API Account management functions
+  const handleCreateApiAccount = async () => {
+    if (!apiAccountForm.name || !apiAccountForm.apiKey) return;
+    
+    try {
+      setApiAccountSaving(true);
+      await createEmailApiAccount(apiAccountForm);
+      await loadEmailApiAccounts();
+      resetApiAccountModal();
+    } catch (err) {
+      console.error('Error creating email API account:', err);
+      setError('Failed to create email API account. Please try again.');
+    } finally {
+      setApiAccountSaving(false);
+    }
+  };
+
+  const handleUpdateApiAccount = async () => {
+    if (!editingApiAccount || !apiAccountForm.name || !apiAccountForm.apiKey) return;
+    
+    try {
+      setApiAccountSaving(true);
+      await updateEmailApiAccount(editingApiAccount._id, apiAccountForm);
+      await loadEmailApiAccounts();
+      resetApiAccountModal();
+    } catch (err) {
+      console.error('Error updating email API account:', err);
+      setError('Failed to update email API account. Please try again.');
+    } finally {
+      setApiAccountSaving(false);
+    }
+  };
+
+  const handleEditApiAccount = (account: EmailApiAccount) => {
+    setEditingApiAccount(account);
+    setApiAccountFormMode('edit');
+    setApiAccountForm({
+      name: account.name,
+      provider: account.provider,
+      apiKey: account.apiKey,
+    });
+    setShowApiAccountModal(true);
+  };
+
+  const handleDeleteApiAccount = async (id: string) => {
+    try {
+      await deleteEmailApiAccount(id);
+      await loadEmailApiAccounts();
+      setShowApiAccountDeleteConfirm(null);
+    } catch (err) {
+      console.error('Error deleting email API account:', err);
+      setError('Failed to delete email API account. Please try again.');
+      setShowApiAccountDeleteConfirm(null);
+    }
+  };
+
+  const resetApiAccountModal = () => {
+    setShowApiAccountModal(false);
+    setApiAccountFormMode('create');
+    setEditingApiAccount(null);
+    setApiAccountForm({
+      name: '',
+      provider: 'brevo',
+      apiKey: ''
+    });
+  };
+
+  const maskApiKey = (apiKey: string) => {
+    if (apiKey.length <= 8) return apiKey;
+    return apiKey.substring(0, 4) + '••••••••' + apiKey.substring(apiKey.length - 4);
   };
   if (loading) {
     return (
@@ -322,62 +432,115 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
-            {/* SMTP Settings Section */}
+
+            {/* Sending Method Section */}
             <div className="mb-6">
-              <h3 className="text-md font-semibold text-gray-800 mb-4">SMTP Settings</h3>
+              <h3 className="text-md font-semibold text-gray-800 mb-4">Sending Method</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Host</label>
-                  <input
-                    type="text"
-                    value={formData.smtpHost}
-                    onChange={(e) => setFormData({...formData, smtpHost: e.target.value})}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Method <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.sendingMethod}
+                    onChange={(e) => setFormData({...formData, sendingMethod: e.target.value as 'smtp' | 'brevo_api'})}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
                     disabled={saving}
-                  />
+                  >
+                    <option value="brevo_api">Brevo API</option>
+                    <option value="smtp">SMTP</option>
+                  </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Port</label>
-                  <input
-                    type="number"
-                    value={formData.smtpPort}
-                    onChange={(e) => setFormData({...formData, smtpPort: parseInt(e.target.value)})}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
-                    disabled={saving}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">SMTP User</label>
-                  <input
-                    type="text"
-                    value={formData.smtpUser}
-                    onChange={(e) => setFormData({...formData, smtpUser: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
-                    placeholder="user@gmail.com"
-                    disabled={saving}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Password</label>
-                  <div className="relative">
+
+                {formData.sendingMethod === 'brevo_api' && (
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Select Brevo Account
+                    </label>
+                    {apiAccountsLoading ? (
+                      <div className="text-sm text-gray-500">Loading accounts...</div>
+                    ) : emailApiAccounts.length === 0 ? (
+                      <div className="text-sm text-gray-500">
+                        No Brevo accounts found. Please create one in the "Email API Accounts" section below.
+                      </div>
+                    ) : (
+                      <select
+                        value={formData.emailApiAccountId}
+                        onChange={(e) => setFormData({...formData, emailApiAccountId: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
+                        disabled={saving}
+                      >
+                        <option value="">Select an account...</option>
+                        {emailApiAccounts.map((account) => (
+                          <option key={account._id} value={account._id}>
+                            {account.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* SMTP Settings Section - Only show if SMTP is selected */}
+            {formData.sendingMethod === 'smtp' && (
+              <div className="mb-6">
+                <h3 className="text-md font-semibold text-gray-800 mb-4">SMTP Settings</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Host</label>
                     <input
-                      type="password"
-                      value={formData.smtpPassword}
-                      onChange={(e) => setFormData({...formData, smtpPassword: e.target.value})}
-                      className="w-full px-3 py-2 pr-10 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
-                      placeholder="App Password / SMTP Password"
+                      type="text"
+                      value={formData.smtpHost}
+                      onChange={(e) => setFormData({...formData, smtpHost: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
                       disabled={saving}
                     />
-                    <button className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                        <circle cx="12" cy="12" r="3"/>
-                      </svg>
-                    </button>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Port</label>
+                    <input
+                      type="number"
+                      value={formData.smtpPort}
+                      onChange={(e) => setFormData({...formData, smtpPort: parseInt(e.target.value)})}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
+                      disabled={saving}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">SMTP User</label>
+                    <input
+                      type="text"
+                      value={formData.smtpUser}
+                      onChange={(e) => setFormData({...formData, smtpUser: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
+                      placeholder="user@gmail.com"
+                      disabled={saving}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Password</label>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        value={formData.smtpPassword}
+                        onChange={(e) => setFormData({...formData, smtpPassword: e.target.value})}
+                        className="w-full px-3 py-2 pr-10 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
+                        placeholder="App Password / SMTP Password"
+                        disabled={saving}
+                      />
+                      <button className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                          <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Form Actions */}
             <div className="flex gap-3">
@@ -447,6 +610,60 @@ export default function SettingsPage() {
             )}
           </div>
 
+          {/* Email API Accounts Management */}
+          <div className="bg-white rounded-xl border border-gray-100 p-6 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Email API Accounts</h3>
+              <button
+                onClick={() => setShowApiAccountModal(true)}
+                className="bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Add New Account
+              </button>
+            </div>
+            
+            {apiAccountsLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent mx-auto mb-2"></div>
+                <p className="text-sm text-gray-500">Loading accounts...</p>
+              </div>
+            ) : emailApiAccounts.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">No email API accounts found. Create your first account above.</p>
+            ) : (
+              <div className="space-y-3">
+                {emailApiAccounts.map((account) => (
+                  <div key={account._id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                    <div>
+                      <h4 className="font-medium text-gray-900">{account.name}</h4>
+                      <div className="text-sm text-gray-500 mt-1">
+                        <span>Provider: {account.provider}</span>
+                        <span className="ml-4">API Key: {maskApiKey(account.apiKey)}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => handleEditApiAccount(account)}
+                        className="text-gray-400 hover:text-accent text-sm font-medium px-3 py-1 rounded-lg hover:bg-accent-light transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => setShowApiAccountDeleteConfirm(account._id)}
+                        className="text-gray-400 hover:text-red-600 text-sm font-medium px-3 py-1 rounded-lg hover:bg-red-50 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Delete Confirmation Modal */}
           {showDeleteConfirm && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -464,6 +681,99 @@ export default function SettingsPage() {
                   </button>
                   <button
                     onClick={() => setShowDeleteConfirm(null)}
+                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Email API Account Modal */}
+          {showApiAccountModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-xl p-6 max-w-md w-full">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  {apiAccountFormMode === 'create' ? 'Create Email API Account' : 'Edit Email API Account'}
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Account Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={apiAccountForm.name}
+                      onChange={(e) => setApiAccountForm({...apiAccountForm, name: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
+                      placeholder="e.g. Brevo Account 1"
+                      disabled={apiAccountSaving}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Provider</label>
+                    <select
+                      value={apiAccountForm.provider}
+                      onChange={(e) => setApiAccountForm({...apiAccountForm, provider: e.target.value as 'brevo'})}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
+                      disabled={apiAccountSaving}
+                    >
+                      <option value="brevo">Brevo</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      API Key <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      value={apiAccountForm.apiKey}
+                      onChange={(e) => setApiAccountForm({...apiAccountForm, apiKey: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
+                      placeholder="xkeysib-..."
+                      disabled={apiAccountSaving}
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={apiAccountFormMode === 'create' ? handleCreateApiAccount : handleUpdateApiAccount}
+                    disabled={apiAccountSaving || !apiAccountForm.name || !apiAccountForm.apiKey}
+                    className="bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {apiAccountSaving && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                    {apiAccountSaving ? 'Saving...' : (apiAccountFormMode === 'create' ? 'Create Account' : 'Update Account')}
+                  </button>
+                  <button
+                    onClick={resetApiAccountModal}
+                    disabled={apiAccountSaving}
+                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Email API Account Delete Confirmation Modal */}
+          {showApiAccountDeleteConfirm && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-xl p-6 max-w-md w-full">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Email API Account</h3>
+                <p className="text-gray-600 text-sm mb-6">
+                  Are you sure you want to delete this email API account? This action cannot be undone and may affect projects using this account.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => handleDeleteApiAccount(showApiAccountDeleteConfirm)}
+                    className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    onClick={() => setShowApiAccountDeleteConfirm(null)}
                     className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
                   >
                     Cancel

@@ -75,6 +75,8 @@ export interface Project {
   smtpPort: number;
   smtpUser?: string;
   smtpPassword?: string;
+  sendingMethod: 'smtp' | 'brevo_api';
+  emailApiAccountId?: string;
   createdAt: string;
 }
 
@@ -358,6 +360,94 @@ export async function importCsv(file: File): Promise<ImportCsvResponse> {
     return json as ImportCsvResponse;
   } catch (error) {
     console.error('Error importing CSV:', error);
+    throw error;
+  }
+}
+
+// ── Email API Account functions ──────────────────────────────────────────────
+
+export interface EmailApiAccount {
+  _id: string;
+  name: string;
+  provider: 'brevo';
+  apiKey: string;
+  createdAt: string;
+}
+
+export async function getEmailApiAccounts(): Promise<EmailApiAccount[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/email-api-accounts`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Failed to fetch email API accounts: ${res.status}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to fetch email API accounts');
+    return json.data;
+  } catch (error) {
+    console.error('Error fetching email API accounts:', error);
+    throw error;
+  }
+}
+
+export async function getEmailApiAccount(id: string): Promise<EmailApiAccount> {
+  try {
+    const res = await fetch(`${API_BASE}/api/email-api-accounts/${id}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Failed to fetch email API account: ${res.status}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to fetch email API account');
+    return json.data;
+  } catch (error) {
+    console.error('Error fetching email API account:', error);
+    throw error;
+  }
+}
+
+export async function createEmailApiAccount(data: Partial<EmailApiAccount>): Promise<EmailApiAccount> {
+  try {
+    const res = await fetch(`${API_BASE}/api/email-api-accounts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(`Failed to create email API account: ${res.status}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to create email API account');
+    return json.data;
+  } catch (error) {
+    console.error('Error creating email API account:', error);
+    throw error;
+  }
+}
+
+export async function updateEmailApiAccount(id: string, data: Partial<EmailApiAccount>): Promise<EmailApiAccount> {
+  try {
+    const res = await fetch(`${API_BASE}/api/email-api-accounts/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(`Failed to update email API account: ${res.status}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to update email API account');
+    return json.data;
+  } catch (error) {
+    console.error('Error updating email API account:', error);
+    throw error;
+  }
+}
+
+export async function deleteEmailApiAccount(id: string): Promise<void> {
+  try {
+    const res = await fetch(`${API_BASE}/api/email-api-accounts/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`Failed to delete email API account: ${res.status}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to delete email API account');
+  } catch (error) {
+    console.error('Error deleting email API account:', error);
     throw error;
   }
 }
