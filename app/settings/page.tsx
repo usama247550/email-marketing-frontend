@@ -461,7 +461,7 @@ export default function SettingsPage() {
                       <div className="text-sm text-gray-500">Loading accounts...</div>
                     ) : emailApiAccounts.length === 0 ? (
                       <div className="text-sm text-gray-500">
-                        No Brevo accounts found. Please create one in the "Email API Accounts" section below.
+                        No Brevo accounts found. Please create one in the &quot;Email API Accounts&quot; section below.
                       </div>
                     ) : (
                       <select

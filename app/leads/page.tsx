@@ -122,7 +122,8 @@ export default function LeadsPage() {
     if (currentView === 'batch-detail' && selectedBatch) {
       fetchLeadsData(selectedBatch._id);
     }
-  }, [leadsPage, currentView, selectedBatch?._id, fetchLeadsData]); // Use selectedBatch?._id instead of selectedBatch
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadsPage, currentView, selectedBatch?._id, fetchLeadsData]); // selectedBatch excluded to prevent infinite loop
 
   const handleViewBatch = (batch: Batch) => {
     setSelectedBatch(batch);
