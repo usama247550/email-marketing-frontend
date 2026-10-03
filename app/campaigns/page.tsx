@@ -43,18 +43,6 @@ export default function CampaignsPage() {
 
   const ITEMS_PER_PAGE = 25;
 
-  // Load projects and campaigns on component mount
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  // Reload campaigns when project filter changes
-  useEffect(() => {
-    if (!loading) {
-      loadCampaigns();
-    }
-  }, [selectedProject, loading, projects]);
-
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -65,7 +53,6 @@ export default function CampaignsPage() {
       ]);
       
       setProjects(projectsData);
-      await loadCampaigns();
       
     } catch (err: any) {
       console.error('Failed to load data:', err);
@@ -110,6 +97,20 @@ export default function CampaignsPage() {
       setCampaigns([]);
     }
   };
+
+  // Load projects and campaigns on component mount
+  useEffect(() => {
+    fetchData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reload campaigns when project filter changes
+  useEffect(() => {
+    if (!loading) {
+      loadCampaigns();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProject, loading, projects]);
 
   const handleProjectChange = (projectId: string) => {
     setSelectedProject(projectId);

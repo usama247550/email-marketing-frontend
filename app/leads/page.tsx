@@ -55,6 +55,7 @@ export default function LeadsPage() {
   // Fetch batches on component mount and when page or project changes
   useEffect(() => {
     fetchBatchesData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [batchesPage, selectedProject]);
 
   // Fetch leads when page changes (only if we're in detail view)
@@ -62,6 +63,7 @@ export default function LeadsPage() {
     if (currentView === 'batch-detail' && selectedBatch) {
       fetchLeadsData(selectedBatch._id);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leadsPage, currentView, selectedBatch]);
 
   const fetchProjects = async () => {

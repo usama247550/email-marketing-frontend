@@ -31,6 +31,7 @@ export default function SettingsPage() {
   // Load projects on component mount
   useEffect(() => {
     loadProjects();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load project data into form when selected project changes or mode changes
