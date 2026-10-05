@@ -451,3 +451,98 @@ export async function deleteEmailApiAccount(id: string): Promise<void> {
     throw error;
   }
 }
+
+// ── Automation API functions ──────────────────────────────────────────────────
+
+export interface ApiAutomation {
+  _id: string;
+  name: string;
+  projectId: { _id: string; name: string; senderEmail: string } | string;
+  templateId: { _id: string; name: string; subject: string } | string;
+  dailyLimit: number;
+  scheduledTime: string; // "HH:mm"
+  status: 'active' | 'paused';
+  lastRunAt: string | null;
+  lastRunSentCount: number;
+  createdAt: string;
+}
+
+export async function getAutomations(): Promise<ApiAutomation[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/automations`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Failed to fetch automations: ${res.status}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to fetch automations');
+    return json.data as ApiAutomation[];
+  } catch (error) {
+    console.error('Error fetching automations:', error);
+    throw error;
+  }
+}
+
+export interface CreateAutomationPayload {
+  name: string;
+  projectId: string;
+  templateId: string;
+  dailyLimit: number;
+  scheduledTime: string;
+  status?: 'active' | 'paused';
+}
+
+export async function createAutomation(data: CreateAutomationPayload): Promise<ApiAutomation> {
+  try {
+    const res = await fetch(`${API_BASE}/api/automations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || `Failed to create automation: ${res.status}`);
+    }
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to create automation');
+    return json.data as ApiAutomation;
+  } catch (error) {
+    console.error('Error creating automation:', error);
+    throw error;
+  }
+}
+
+export async function updateAutomation(
+  id: string,
+  data: Partial<CreateAutomationPayload> & { status?: 'active' | 'paused' }
+): Promise<ApiAutomation> {
+  try {
+    const res = await fetch(`${API_BASE}/api/automations/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || `Failed to update automation: ${res.status}`);
+    }
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to update automation');
+    return json.data as ApiAutomation;
+  } catch (error) {
+    console.error('Error updating automation:', error);
+    throw error;
+  }
+}
+
+export async function deleteAutomation(id: string): Promise<void> {
+  try {
+    const res = await fetch(`${API_BASE}/api/automations/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || `Failed to delete automation: ${res.status}`);
+    }
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Failed to delete automation');
+  } catch (error) {
+    console.error('Error deleting automation:', error);
+    throw error;
+  }
+}
