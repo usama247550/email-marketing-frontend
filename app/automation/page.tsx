@@ -55,11 +55,20 @@ function formatLastRun(lastRunAt: string | null, lastRunSentCount: number): stri
   return `Last ran: ${formatted}${count}`;
 }
 
-/** Pull a plain string id out of a populated-or-string field */
-function getId(field: { _id: string } | string): string {
+/** Pull a plain string id out of a populated-or-string field.
+ *  Returns '' when the reference is null (deleted document). */
+function getId(field: { _id: string } | string | null | undefined): string {
+  if (field == null) return '';
   return typeof field === 'object' ? field._id : field;
 }
-function getName(field: { name: string } | string, fallback = '—'): string {
+
+/** Pull a display name out of a populated-or-string field.
+ *  Returns the fallback when the reference is null (deleted document). */
+function getName(
+  field: { name: string } | string | null | undefined,
+  fallback = '—'
+): string {
+  if (field == null) return fallback;
   return typeof field === 'object' ? field.name : fallback;
 }
 
@@ -381,12 +390,24 @@ export default function AutomationPage() {
                           {automation.name}
                         </div>
                         <div className="flex flex-wrap gap-1.5 mt-1">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                            {getName(automation.projectId)}
-                          </span>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
-                            {getName(automation.templateId)}
-                          </span>
+                          {automation.projectId == null ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-600 border border-red-200">
+                              ⚠ Project deleted
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                              {getName(automation.projectId)}
+                            </span>
+                          )}
+                          {automation.templateId == null ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-600 border border-red-200">
+                              ⚠ Template deleted
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                              {getName(automation.templateId)}
+                            </span>
+                          )}
                         </div>
                       </td>
 

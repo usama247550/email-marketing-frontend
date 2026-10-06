@@ -457,8 +457,9 @@ export async function deleteEmailApiAccount(id: string): Promise<void> {
 export interface ApiAutomation {
   _id: string;
   name: string;
-  projectId: { _id: string; name: string; senderEmail: string } | string;
-  templateId: { _id: string; name: string; subject: string } | string;
+  // null when the referenced Project/Template has been deleted
+  projectId: { _id: string; name: string; senderEmail: string } | string | null;
+  templateId: { _id: string; name: string; subject: string } | string | null;
   dailyLimit: number;
   scheduledTime: string; // "HH:mm"
   status: 'active' | 'paused';
