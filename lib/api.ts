@@ -547,3 +547,73 @@ export async function deleteAutomation(id: string): Promise<void> {
     throw error;
   }
 }
+
+// ── Lead Finder API functions ─────────────────────────────────────────────────
+
+export interface MultiNicheSearchPayload {
+  projectId:  string;
+  country:    string;
+  city:       string;
+  niches:     string[];
+  totalLeads: number;
+}
+
+export interface NicheBreakdown {
+  niche:   string;
+  found:   number;
+  valid:   number;
+  invalid: number;
+}
+
+export interface MultiNicheSearchResult {
+  batchId:           string;
+  totalFound:        number;
+  validCount:        number;
+  invalidCount:      number;
+  perNicheBreakdown: NicheBreakdown[];
+}
+
+export interface LeadFinderJobStatus {
+  status:     'running' | 'done' | 'error';
+  startedAt:  string;
+  finishedAt: string | null;
+  params:     MultiNicheSearchPayload;
+  result?:    MultiNicheSearchResult;
+  error?:     string;
+}
+
+/**
+ * POST /api/lead-finder/multi-niche-search
+ * Starts the search job and returns the jobId immediately (HTTP 202).
+ */
+export async function triggerMultiNicheSearch(
+  payload: MultiNicheSearchPayload,
+): Promise<{ jobId: string }> {
+  const res = await fetch(`${API_BASE}/api/lead-finder/multi-niche-search`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(
+      err.details ? err.details.join(' ') : err.error || `Request failed: ${res.status}`,
+    );
+  }
+  return res.json();
+}
+
+/**
+ * GET /api/lead-finder/status/:jobId
+ * Returns the current status of a running or finished job.
+ */
+export async function pollLeadFinderJob(jobId: string): Promise<LeadFinderJobStatus> {
+  const res = await fetch(`${API_BASE}/api/lead-finder/status/${encodeURIComponent(jobId)}`, {
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Status check failed: ${res.status}`);
+  }
+  return res.json();
+}

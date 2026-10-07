@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, KeyboardEvent, useCallback } from 'react';
 import Topbar from '@/components/dashboard/Topbar';
 import { FALLBACK_COUNTRIES, type StaticCountry } from '@/lib/countries';
-import { getProjects, type Project } from '@/lib/api';
+import { getProjects, triggerMultiNicheSearch, pollLeadFinderJob, type Project, type MultiNicheSearchResult } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,7 +78,12 @@ export default function LeadFinderPage() {
   });
   const [nicheInput, setNicheInput] = useState('');
   const nicheInputRef = useRef<HTMLInputElement>(null);
-  const [multiSearched, setMultiSearched] = useState(false);
+
+  // ── Tab 1: async search state ────────────────────────────────────────────────
+  type MultiStage = 'idle' | 'loading' | 'done' | 'error';
+  const [multiStage, setMultiStage]   = useState<MultiStage>('idle');
+  const [multiResult, setMultiResult] = useState<MultiNicheSearchResult | null>(null);
+  const [multiError, setMultiError]   = useState<string>('');
 
   // ── Tab 2: Smart Search ──────────────────────────────────────────────────────
   const [smartForm, setSmartForm] = useState({ projectId: '', description: '' });
@@ -202,12 +207,49 @@ export default function LeadFinderPage() {
     !!multiForm.projectId && !!multiForm.country &&
     multiForm.city.trim() !== '' && multiForm.niches.length > 0;
 
-  const handleFindLeads = () => {
-    console.log('[LeadFinder] Multi-Niche payload:', {
-      projectId: multiForm.projectId, country: multiForm.country,
-      city: multiForm.city, niches: multiForm.niches, totalLeads: multiForm.totalLeads,
-    });
-    setMultiSearched(true);
+  const handleFindLeads = async () => {
+    setMultiStage('loading');
+    setMultiResult(null);
+    setMultiError('');
+
+    try {
+      // Step 1: kick off the job — backend responds in <200 ms with a jobId
+      const { jobId } = await triggerMultiNicheSearch({
+        projectId:  multiForm.projectId,
+        country:    multiForm.country,
+        city:       multiForm.city,
+        niches:     multiForm.niches,
+        totalLeads: multiForm.totalLeads,
+      });
+
+      // Step 2: poll until the job is done (or failed)
+      // Backend scrapes websites in parallel; budget 3 min max (300 s × 2 s interval)
+      const POLL_INTERVAL_MS = 2000;
+      const POLL_MAX_ATTEMPTS = 90; // 90 × 2 s = 3 minutes
+
+      for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
+        await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+        const status = await pollLeadFinderJob(jobId);
+
+        if (status.status === 'done' && status.result) {
+          setMultiResult(status.result);
+          setMultiStage('done');
+          return;
+        }
+        if (status.status === 'error') {
+          throw new Error(status.error || 'The search failed on the server.');
+        }
+        // still 'running' — keep polling
+      }
+
+      // Timed out polling
+      throw new Error('The search is taking longer than expected. Check the Leads page in a few minutes — the batch may still complete.');
+
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      setMultiError(msg);
+      setMultiStage('error');
+    }
   };
 
   // ─── Tab 2: animated progress then results ────────────────────────────────────
@@ -490,22 +532,89 @@ export default function LeadFinderPage() {
 
                 {/* Submit */}
                 <button
-                  onClick={handleFindLeads} disabled={!canFindLeads}
-                  className="w-full bg-accent hover:bg-accent-hover disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors mt-2"
+                  onClick={handleFindLeads} disabled={!canFindLeads || multiStage === 'loading'}
+                  className="w-full bg-accent hover:bg-accent-hover disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors mt-2 flex items-center justify-center gap-2"
                 >
-                  {multiForm.niches.length > 1 ? `Find Leads across ${multiForm.niches.length} Niches` : 'Find Leads'}
+                  {multiStage === 'loading' ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                      </svg>
+                      Searching…
+                    </>
+                  ) : multiForm.niches.length > 1 ? `Find Leads across ${multiForm.niches.length} Niches` : 'Find Leads'}
                 </button>
 
-                {multiSearched && (
-                  <div className="flex items-start gap-2.5 bg-green-50 border border-green-200 rounded-lg px-3.5 py-3">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 shrink-0 mt-0.5">
-                      <polyline points="20 6 9 17 4 12"/>
+                {/* ── Loading state ── */}
+                {multiStage === 'loading' && (
+                  <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-lg px-3.5 py-3">
+                    <svg className="animate-spin h-4 w-4 text-blue-500 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
                     </svg>
                     <div>
-                      <p className="text-sm font-medium text-green-800">Search queued!</p>
-                      <p className="text-xs text-green-700 mt-0.5">
-                        Searching {multiForm.niches.length} niche{multiForm.niches.length > 1 ? 's' : ''} in {multiForm.city}, {multiForm.country} — up to {multiForm.totalLeads} leads total. Backend wiring coming in the next step.
+                      <p className="text-sm font-medium text-blue-800">Searching businesses and checking websites…</p>
+                      <p className="text-xs text-blue-600 mt-0.5">
+                        Querying TomTom for {multiForm.niches.length} niche{multiForm.niches.length > 1 ? 's' : ''} in {multiForm.city}, {multiForm.country} then scraping websites for emails. This may take a minute.
                       </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Success state ── */}
+                {multiStage === 'done' && multiResult && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg px-3.5 py-3 space-y-2.5">
+                    <div className="flex items-start gap-2.5">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 shrink-0 mt-0.5">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-green-800">
+                          Found {multiResult.totalFound} lead{multiResult.totalFound !== 1 ? 's' : ''} across {multiForm.niches.length} niche{multiForm.niches.length !== 1 ? 's' : ''}
+                        </p>
+                        <p className="text-xs text-green-700 mt-0.5">
+                          {multiResult.validCount} valid email{multiResult.validCount !== 1 ? 's' : ''} · {multiResult.invalidCount} without email · saved to a new batch
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Per-niche breakdown */}
+                    {multiResult.perNicheBreakdown.length > 1 && (
+                      <div className="ml-6 space-y-1">
+                        {multiResult.perNicheBreakdown.map(nb => (
+                          <div key={nb.niche} className="flex items-center justify-between text-xs text-green-700">
+                            <span className="font-medium">{nb.niche}</span>
+                            <span>{nb.found} found · {nb.valid} valid</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* View batch link */}
+                    <div className="ml-6">
+                      <a
+                        href={`/leads?batch=${multiResult.batchId}`}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-700 hover:text-green-900 underline underline-offset-2"
+                      >
+                        View batch in Leads
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Error state ── */}
+                {multiStage === 'error' && multiError && (
+                  <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-lg px-3.5 py-3">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-red-500 shrink-0 mt-0.5">
+                      <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                    </svg>
+                    <div>
+                      <p className="text-sm font-medium text-red-800">Search failed</p>
+                      <p className="text-xs text-red-600 mt-0.5">{multiError}</p>
                     </div>
                   </div>
                 )}
