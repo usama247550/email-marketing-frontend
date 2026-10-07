@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, KeyboardEvent, useCallback } from 'react';
 import Topbar from '@/components/dashboard/Topbar';
 import { FALLBACK_COUNTRIES, type StaticCountry } from '@/lib/countries';
-import { getProjects, triggerMultiNicheSearch, pollLeadFinderJob, type Project, type MultiNicheSearchResult } from '@/lib/api';
+import { getProjects, triggerMultiNicheSearch, pollLeadFinderJob, type Project, type MultiNicheSearchResult, type LeadFinderJobProgress } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,14 +76,18 @@ export default function LeadFinderPage() {
     niches:     [] as string[],
     totalLeads: 100,
   });
+  const [allCities, setAllCities]   = useState(false);
   const [nicheInput, setNicheInput] = useState('');
   const nicheInputRef = useRef<HTMLInputElement>(null);
 
   // ── Tab 1: async search state ────────────────────────────────────────────────
   type MultiStage = 'idle' | 'loading' | 'done' | 'error';
-  const [multiStage, setMultiStage]   = useState<MultiStage>('idle');
-  const [multiResult, setMultiResult] = useState<MultiNicheSearchResult | null>(null);
-  const [multiError, setMultiError]   = useState<string>('');
+  const [multiStage, setMultiStage]       = useState<MultiStage>('idle');
+  const [multiResult, setMultiResult]     = useState<MultiNicheSearchResult | null>(null);
+  const [multiError, setMultiError]       = useState<string>('');
+  const [multiProgress, setMultiProgress] = useState<LeadFinderJobProgress | null>(null);
+  // Stable ref to the poll-interval timer so we can clear it from anywhere
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Tab 2: Smart Search ──────────────────────────────────────────────────────
   const [smartForm, setSmartForm] = useState({ projectId: '', description: '' });
@@ -205,51 +209,80 @@ export default function LeadFinderPage() {
 
   const canFindLeads =
     !!multiForm.projectId && !!multiForm.country &&
-    multiForm.city.trim() !== '' && multiForm.niches.length > 0;
+    (allCities || multiForm.city.trim() !== '') && multiForm.niches.length > 0;
 
   const handleFindLeads = async () => {
+    // Clear any stale timer from a previous run
+    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+
     setMultiStage('loading');
     setMultiResult(null);
     setMultiError('');
+    setMultiProgress(null);
+
+    let jobId: string;
 
     try {
-      // Step 1: kick off the job — backend responds in <200 ms with a jobId
-      const { jobId } = await triggerMultiNicheSearch({
+      // ── Step 1: fire job, get jobId back in <200 ms ──────────────────────
+      const startResp = await triggerMultiNicheSearch({
         projectId:  multiForm.projectId,
         country:    multiForm.country,
-        city:       multiForm.city,
+        city:       allCities ? '' : multiForm.city,
         niches:     multiForm.niches,
         totalLeads: multiForm.totalLeads,
       });
+      jobId = startResp.jobId;
+    } catch (err) {
+      setMultiError(err instanceof Error ? err.message : 'Failed to start search.');
+      setMultiStage('error');
+      return;
+    }
 
-      // Step 2: poll until the job is done (or failed)
-      // Backend scrapes websites in parallel; budget 3 min max (300 s × 2 s interval)
-      const POLL_INTERVAL_MS = 2000;
-      const POLL_MAX_ATTEMPTS = 90; // 90 × 2 s = 3 minutes
+    // ── Step 2: poll every 2.5 s, update live progress state each tick ────
+    const POLL_INTERVAL_MS  = 2500;
+    const MAX_POLL_ATTEMPTS = 120;  // 120 × 2.5 s = 5 minutes max
+    let   attempts          = 0;
 
-      for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
-        await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+    pollTimerRef.current = setInterval(async () => {
+      attempts++;
+
+      // Hard timeout guard
+      if (attempts > MAX_POLL_ATTEMPTS) {
+        clearInterval(pollTimerRef.current!);
+        pollTimerRef.current = null;
+        setMultiError(
+          'The search is taking longer than expected. Check the Leads page in a few minutes — the batch may still complete in the background.'
+        );
+        setMultiStage('error');
+        return;
+      }
+
+      try {
         const status = await pollLeadFinderJob(jobId);
 
+        // Always update live progress so counters animate on every tick
+        if (status.progress) setMultiProgress(status.progress);
+
         if (status.status === 'done' && status.result) {
+          clearInterval(pollTimerRef.current!);
+          pollTimerRef.current = null;
           setMultiResult(status.result);
           setMultiStage('done');
           return;
         }
+
         if (status.status === 'error') {
-          throw new Error(status.error || 'The search failed on the server.');
+          clearInterval(pollTimerRef.current!);
+          pollTimerRef.current = null;
+          setMultiError(status.error || 'The search failed on the server.');
+          setMultiStage('error');
         }
-        // still 'running' — keep polling
+        // 'running' → keep polling, live progress already updated above
+      } catch (err) {
+        // Transient network hiccup — don't abort, just skip this tick
+        console.warn('[LeadFinder] Poll error (will retry):', err);
       }
-
-      // Timed out polling
-      throw new Error('The search is taking longer than expected. Check the Leads page in a few minutes — the batch may still complete.');
-
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'An unexpected error occurred.';
-      setMultiError(msg);
-      setMultiStage('error');
-    }
+    }, POLL_INTERVAL_MS);
   };
 
   // ─── Tab 2: animated progress then results ────────────────────────────────────
@@ -433,16 +466,37 @@ export default function LeadFinderPage() {
 
                 {/* City */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    City <span className="text-red-500">*</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-sm font-medium text-gray-700">
+                      City {!allCities && <span className="text-red-500">*</span>}
+                    </label>
+                    {/* All Cities toggle */}
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={allCities}
+                        onChange={e => {
+                          setAllCities(e.target.checked);
+                          if (e.target.checked) setMultiForm(f => ({ ...f, city: '' }));
+                        }}
+                        className="w-3.5 h-3.5 rounded border-gray-300 text-accent focus:ring-accent/30 cursor-pointer"
+                      />
+                      <span className="text-xs text-gray-500">All cities in country</span>
+                    </label>
+                  </div>
                   <input
                     type="text"
                     value={multiForm.city}
                     onChange={e => setMultiForm(f => ({ ...f, city: e.target.value }))}
-                    placeholder="e.g. Frankfurt"
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
+                    disabled={allCities}
+                    placeholder={allCities ? 'Searching entire country…' : 'e.g. Frankfurt'}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
                   />
+                  {allCities && (
+                    <p className="mt-1 text-xs text-amber-600">
+                      ⚠ Whole-country searches may return more varied results and take a bit longer.
+                    </p>
+                  )}
                 </div>
 
                 {/* ── Niches — clean input + separate tag row below ── */}
@@ -546,19 +600,59 @@ export default function LeadFinderPage() {
                   ) : multiForm.niches.length > 1 ? `Find Leads across ${multiForm.niches.length} Niches` : 'Find Leads'}
                 </button>
 
-                {/* ── Loading state ── */}
+                {/* ── Loading state: live progress ── */}
                 {multiStage === 'loading' && (
-                  <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-lg px-3.5 py-3">
-                    <svg className="animate-spin h-4 w-4 text-blue-500 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                    </svg>
-                    <div>
-                      <p className="text-sm font-medium text-blue-800">Searching businesses and checking websites…</p>
-                      <p className="text-xs text-blue-600 mt-0.5">
-                        Querying TomTom for {multiForm.niches.length} niche{multiForm.niches.length > 1 ? 's' : ''} in {multiForm.city}, {multiForm.country} then scraping websites for emails. This may take a minute.
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg px-3.5 py-3.5 space-y-3">
+
+                    {/* Header row */}
+                    <div className="flex items-center gap-2.5">
+                      <svg className="animate-spin h-4 w-4 text-blue-500 shrink-0" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                      </svg>
+                      <p className="text-sm font-medium text-blue-800">
+                        {multiProgress
+                          ? `Searching "${multiProgress.currentNiche}"…`
+                          : 'Starting search…'}
                       </p>
                     </div>
+
+                    {/* Live counters */}
+                    {multiProgress && (
+                      <div className="flex items-center gap-4 text-xs text-blue-700 font-medium">
+                        <span>
+                          <span className="text-blue-900 font-bold tabular-nums">{multiProgress.checked}</span>
+                          {' '}businesses checked
+                        </span>
+                        <span className="text-blue-400">·</span>
+                        <span>
+                          <span className="text-blue-900 font-bold tabular-nums">{multiProgress.validFound}</span>
+                          {' '}valid leads found
+                        </span>
+                        <span className="text-blue-400">·</span>
+                        <span>target: {multiProgress.target}</span>
+                      </div>
+                    )}
+
+                    {/* Progress bar */}
+                    <div className="h-1.5 bg-blue-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500 rounded-full transition-all duration-700 ease-out"
+                        style={{
+                          width: multiProgress && multiProgress.target > 0
+                            ? `${Math.min(100, Math.round((multiProgress.validFound / multiProgress.target) * 100))}%`
+                            : '4%',
+                        }}
+                      />
+                    </div>
+
+                    {/* Sub-label */}
+                    <p className="text-xs text-blue-600">
+                      {multiProgress
+                        ? `${Math.min(100, Math.round((multiProgress.validFound / multiProgress.target) * 100))}% of target · scraping websites for emails`
+                        : `Querying TomTom across ${multiForm.niches.length} niche${multiForm.niches.length > 1 ? 's' : ''} in ${allCities ? multiForm.country : `${multiForm.city}, ${multiForm.country}`}…`
+                      }
+                    </p>
                   </div>
                 )}
 
@@ -571,21 +665,40 @@ export default function LeadFinderPage() {
                       </svg>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-green-800">
-                          Found {multiResult.totalFound} lead{multiResult.totalFound !== 1 ? 's' : ''} across {multiForm.niches.length} niche{multiForm.niches.length !== 1 ? 's' : ''}
+                          Found {multiResult.totalFound} valid lead{multiResult.totalFound !== 1 ? 's' : ''} across {multiForm.niches.length} niche{multiForm.niches.length !== 1 ? 's' : ''}
                         </p>
                         <p className="text-xs text-green-700 mt-0.5">
-                          {multiResult.validCount} valid email{multiResult.validCount !== 1 ? 's' : ''} · {multiResult.invalidCount} without email · saved to a new batch
+                          Checked {multiResult.checkedCount} businesses · {multiResult.tomtomCallCount} TomTom API calls · saved to a new batch
                         </p>
                       </div>
                     </div>
+
+                    {/* Early-stop warning */}
+                    {multiResult.stopReason && (
+                      <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-2">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-600 shrink-0 mt-0.5">
+                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        <p className="text-xs text-amber-800">
+                          {multiResult.stopReason === 'rate_limit'
+                            ? `Search stopped early — TomTom API quota reached. Got ${multiResult.totalFound} of ${multiForm.totalLeads} requested leads. Wait for your quota to reset before running another large search.`
+                            : `Search reached the per-niche business cap. Got ${multiResult.totalFound} of ${multiForm.totalLeads} requested leads.`
+                          }
+                        </p>
+                      </div>
+                    )}
 
                     {/* Per-niche breakdown */}
                     {multiResult.perNicheBreakdown.length > 1 && (
                       <div className="ml-6 space-y-1">
                         {multiResult.perNicheBreakdown.map(nb => (
                           <div key={nb.niche} className="flex items-center justify-between text-xs text-green-700">
-                            <span className="font-medium">{nb.niche}</span>
-                            <span>{nb.found} found · {nb.valid} valid</span>
+                            <span className="font-medium">
+                              {nb.niche}
+                              {nb.skipped && <span className="ml-1 text-amber-600">(skipped)</span>}
+                              {nb.stoppedEarly && !nb.skipped && <span className="ml-1 text-amber-600">(stopped early)</span>}
+                            </span>
+                            <span>{nb.skipped ? '—' : `${nb.validFound} valid from ${nb.totalChecked} checked`}</span>
                           </div>
                         ))}
                       </div>
@@ -669,7 +782,11 @@ export default function LeadFinderPage() {
                 </div>
                 <div className="flex justify-between items-center py-2.5">
                   <span className="text-sm text-gray-500">City</span>
-                  <span className="text-sm font-medium text-gray-900">{multiForm.city || '—'}</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {allCities
+                      ? <span className="text-accent font-medium">All cities</span>
+                      : multiForm.city || '—'}
+                  </span>
                 </div>
                 <div className="flex justify-between items-start py-2.5">
                   <span className="text-sm text-gray-500 shrink-0 mr-4">Niches</span>

@@ -553,24 +553,34 @@ export async function deleteAutomation(id: string): Promise<void> {
 export interface MultiNicheSearchPayload {
   projectId:  string;
   country:    string;
-  city:       string;
+  city:       string;   // empty string = search entire country (All Cities mode)
   niches:     string[];
   totalLeads: number;
 }
 
 export interface NicheBreakdown {
-  niche:   string;
-  found:   number;
-  valid:   number;
-  invalid: number;
+  niche:         string;
+  validFound:    number;   // valid leads with email
+  totalChecked:  number;   // total businesses checked from TomTom
+  skipped?:      boolean;  // niche was skipped because rate limit hit earlier
+  stoppedEarly?: 'cap_hit' | 'rate_limit';
 }
 
 export interface MultiNicheSearchResult {
   batchId:           string;
-  totalFound:        number;
+  totalFound:        number;  // valid leads saved
   validCount:        number;
-  invalidCount:      number;
+  checkedCount:      number;  // total businesses checked across all niches
+  tomtomCallCount:   number;  // total TomTom API calls made this run
+  stopReason:        'rate_limit' | 'cap_hit' | null;  // null = completed normally
   perNicheBreakdown: NicheBreakdown[];
+}
+
+export interface LeadFinderJobProgress {
+  checked:      number;   // total businesses checked so far (across all niches)
+  validFound:   number;   // valid emails found so far
+  target:       number;   // total valid leads requested
+  currentNiche: string;   // niche currently being processed
 }
 
 export interface LeadFinderJobStatus {
@@ -578,6 +588,7 @@ export interface LeadFinderJobStatus {
   startedAt:  string;
   finishedAt: string | null;
   params:     MultiNicheSearchPayload;
+  progress:   LeadFinderJobProgress;  // always present — live counts while running
   result?:    MultiNicheSearchResult;
   error?:     string;
 }
