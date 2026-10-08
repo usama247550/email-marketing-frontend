@@ -617,6 +617,7 @@ export async function triggerMultiNicheSearch(
 /**
  * GET /api/lead-finder/status/:jobId
  * Returns the current status of a running or finished job.
+ * Works for both multi-niche and smart search jobs.
  */
 export async function pollLeadFinderJob(jobId: string): Promise<LeadFinderJobStatus> {
   const res = await fetch(`${API_BASE}/api/lead-finder/status/${encodeURIComponent(jobId)}`, {
@@ -625,6 +626,114 @@ export async function pollLeadFinderJob(jobId: string): Promise<LeadFinderJobSta
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Status check failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+// ── Smart Search API functions ────────────────────────────────────────────────
+
+export interface SmartSearchParsedParams {
+  country:    string;
+  city:       string | null;
+  niche:      string;
+  criteria:   string | null;
+  leadsCount: number;
+}
+
+export interface SmartSearchLead {
+  company: string;
+  city:    string;
+  website: string;
+  email:   string;
+  niche:   string;
+  reason:  string;
+}
+
+export interface SmartSearchSummary {
+  candidatesFound:    number;
+  checked:            number;
+  withEmail:          number;
+  matched:            number;
+  tomtomCallCount:    number;
+  stoppedEarlyReason: string | null;
+}
+
+export interface SmartSearchProgress {
+  stage:           string;
+  detail:          string;
+  total?:          number;
+  checked?:        number;
+  candidatesFound?: number;
+}
+
+export interface SmartJobStatus {
+  type:         'smart';
+  status:       'running' | 'done' | 'error';
+  stage:        string;
+  startedAt:    string;
+  finishedAt:   string | null;
+  params:       { projectId: string; instructionText: string };
+  parsedParams: SmartSearchParsedParams | null;
+  progress:     SmartSearchProgress;
+  results?:     SmartSearchLead[];
+  summary?:     SmartSearchSummary;
+  error?:       string;
+  saved?:       boolean;
+}
+
+/**
+ * POST /api/lead-finder/smart-search
+ * Starts a smart search job, returns { jobId } immediately (HTTP 202).
+ */
+export async function startSmartSearch(payload: {
+  projectId:       string;
+  instructionText: string;
+}): Promise<{ jobId: string }> {
+  const res = await fetch(`${API_BASE}/api/lead-finder/smart-search`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(
+      err.details ? err.details.join(' ') : err.error || `Request failed: ${res.status}`,
+    );
+  }
+  return res.json();
+}
+
+/**
+ * GET /api/lead-finder/status/:jobId  (smart-search variant)
+ * Same endpoint, typed for the smart job response shape.
+ */
+export async function getSmartSearchStatus(jobId: string): Promise<SmartJobStatus> {
+  const res = await fetch(`${API_BASE}/api/lead-finder/status/${encodeURIComponent(jobId)}`, {
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Status check failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+/**
+ * POST /api/lead-finder/smart-search/:jobId/save
+ * Saves selected leads from a completed smart search job to a new Batch.
+ */
+export async function saveSmartSearch(
+  jobId: string,
+  selectedEmails: string[],
+): Promise<{ success: boolean; batchId: string; batchName: string; savedCount: number }> {
+  const res = await fetch(`${API_BASE}/api/lead-finder/smart-search/${encodeURIComponent(jobId)}/save`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ selectedEmails }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Save failed: ${res.status}`);
   }
   return res.json();
 }

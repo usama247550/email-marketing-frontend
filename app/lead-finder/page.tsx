@@ -1,9 +1,9 @@
 ﻿'use client';
 
-import { useState, useEffect, useRef, KeyboardEvent, useCallback } from 'react';
+import { useState, useEffect, useRef, KeyboardEvent } from 'react';
 import Topbar from '@/components/dashboard/Topbar';
 import { FALLBACK_COUNTRIES, type StaticCountry } from '@/lib/countries';
-import { getProjects, triggerMultiNicheSearch, pollLeadFinderJob, type Project, type MultiNicheSearchResult, type LeadFinderJobProgress } from '@/lib/api';
+import { getProjects, triggerMultiNicheSearch, pollLeadFinderJob, startSmartSearch, getSmartSearchStatus, saveSmartSearch, type Project, type MultiNicheSearchResult, type LeadFinderJobProgress, type SmartSearchLead, type SmartSearchParsedParams, type SmartSearchSummary } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -18,35 +18,14 @@ type SmartStage  = 'idle' | 'running' | 'results' | 'saved';
 
 const MAX_NICHES = 10;
 
-// ─── Mock AI result data ──────────────────────────────────────────────────────
-
-interface MockLead {
-  id:      string;
-  company: string;
-  website: string;
-  email:   string;
-  reason:  string;
-}
-
-const MOCK_LEADS: MockLead[] = [
-  { id: 'ml1', company: 'Ristorante Da Marco',         website: 'damarco-berlin.de',          email: 'info@damarco-berlin.de',          reason: 'Site last updated 2018, no SSL, missing meta tags' },
-  { id: 'ml2', company: 'Gasthaus Zum Goldenen Löwen', website: 'goldener-loewen-muenchen.de', email: 'kontakt@goldener-loewen.de',       reason: 'Flash-based site, no mobile version, outdated design' },
-  { id: 'ml3', company: 'Café Brennstein',             website: 'cafe-brennstein.com',         email: 'hallo@cafe-brennstein.com',        reason: 'WordPress 4.9, expired SSL, slow load (8.4s)' },
-  { id: 'ml4', company: 'Trattoria Bella Napoli',      website: 'bella-napoli-hamburg.de',     email: 'info@bella-napoli-hamburg.de',     reason: 'No online menu, HTML tables layout, last crawled 2020' },
-  { id: 'ml5', company: 'Restaurant Zur Alten Post',   website: 'zur-alten-post.com',          email: 'post@zur-alten-post.com',          reason: 'No Google Maps embed, PageSpeed 22/100, no HTTPS' },
-  { id: 'ml6', company: "Wirtshaus Lederhos'n",        website: 'lederhosnwirt.de',            email: 'reservierung@lederhosnwirt.de',    reason: 'Broken contact form, images not optimised, 2017 copyright' },
-  { id: 'ml7', company: 'Osteria Piccolo Mondo',       website: 'piccolomondo-koeln.de',       email: 'tisch@piccolomondo-koeln.de',      reason: 'No GDPR cookie banner, no reviews widget, outdated navbar' },
-  { id: 'ml8', company: 'Biergarten Am Stadtpark',     website: 'biergarten-stadtpark.de',     email: 'info@biergarten-stadtpark.de',     reason: 'Static HTML site, no booking system, no social links' },
-];
-
+// Step labels for the Smart Search progress indicator
+// Indexes map to backend stages: 0=analyzing, 1=searching, 2=checking, 3=filtering
 const PROGRESS_STEPS = [
   { id: 'analyze', label: 'Analyzing your request…'  },
   { id: 'search',  label: 'Searching businesses…'    },
   { id: 'check',   label: 'Checking websites…'       },
   { id: 'filter',  label: 'Filtering matches…'       },
 ];
-
-const STEP_DELAY_MS = 1400;
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -90,12 +69,29 @@ export default function LeadFinderPage() {
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Tab 2: Smart Search ──────────────────────────────────────────────────────
-  const [smartForm, setSmartForm] = useState({ projectId: '', description: '' });
-  const [smartStage, setSmartStage]           = useState<SmartStage>('idle');
-  const [currentStep, setCurrentStep]         = useState(-1);
-  const [completedSteps, setCompletedSteps]   = useState<Set<number>>(new Set());
-  const [resultLeads, setResultLeads]         = useState<MockLead[]>([]);
-  const [checkedIds, setCheckedIds]           = useState<Set<string>>(new Set());
+  const [smartForm, setSmartForm]       = useState({ projectId: '', description: '' });
+  const [smartStage, setSmartStage]     = useState<SmartStage>('idle');
+  const [currentStep, setCurrentStep]   = useState(-1);
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
+  // Real data replacing mocks
+  const [resultLeads, setResultLeads]   = useState<SmartSearchLead[]>([]);
+  const [checkedEmails, setCheckedEmails] = useState<Set<string>>(new Set());
+  const [smartParsedParams, setSmartParsedParams] = useState<SmartSearchParsedParams | null>(null);
+  const [smartSummary, setSmartSummary] = useState<SmartSearchSummary | null>(null);
+  const [smartError, setSmartError]     = useState<string>('');
+  const [smartSaveResult, setSmartSaveResult] = useState<{ batchId: string; batchName: string; savedCount: number } | null>(null);
+  const [smartSaving, setSmartSaving]   = useState(false);
+  const [smartCheckDetail, setSmartCheckDetail] = useState<string>('');
+  // Refs — stable across renders, safe to read from intervals
+  const smartJobIdRef  = useRef<string>('');
+  const smartPollRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Stop polling on unmount
+  useEffect(() => {
+    return () => {
+      if (smartPollRef.current) clearInterval(smartPollRef.current);
+    };
+  }, []);
 
   // ─── Data loading ─────────────────────────────────────────────────────────
 
@@ -285,51 +281,145 @@ export default function LeadFinderPage() {
     }, POLL_INTERVAL_MS);
   };
 
-  // ─── Tab 2: animated progress then results ────────────────────────────────────
+  // ─── Tab 2: Smart Search ─────────────────────────────────────────────────────
 
   const canSmartSearch = !!smartForm.projectId && smartForm.description.trim().length > 0;
 
-  const runSmartProgress = useCallback(() => {
+  // Map backend stage string → step index (0-3)
+  const stageToStep = (stage: string): number => {
+    if (stage === 'analyzing') return 0;
+    if (stage === 'searching') return 1;
+    if (stage === 'checking')  return 2;
+    if (stage === 'filtering') return 3;
+    return -1;
+  };
+
+  const handleSmartSearch = async () => {
+    if (smartPollRef.current) clearInterval(smartPollRef.current);
+
     setSmartStage('running');
     setCurrentStep(0);
     setCompletedSteps(new Set());
-    PROGRESS_STEPS.forEach((_, idx) => {
-      setTimeout(() => {
-        setCompletedSteps(prev => { const next = new Set(prev); if (idx > 0) next.add(idx - 1); return next; });
-        setCurrentStep(idx);
-      }, idx * STEP_DELAY_MS);
-    });
-    const totalDelay = PROGRESS_STEPS.length * STEP_DELAY_MS;
-    setTimeout(() => { setCompletedSteps(new Set([0, 1, 2, 3])); setCurrentStep(-1); }, totalDelay);
-    setTimeout(() => {
-      setResultLeads(MOCK_LEADS);
-      setCheckedIds(new Set(MOCK_LEADS.map(l => l.id)));
-      setSmartStage('results');
-    }, totalDelay + 400);
-  }, []);
+    setResultLeads([]);
+    setCheckedEmails(new Set());
+    setSmartParsedParams(null);
+    setSmartSummary(null);
+    setSmartError('');
+    setSmartSaveResult(null);
+    setSmartCheckDetail('');
 
-  const handleSmartSearch = () => { console.log('[LeadFinder] Smart Search payload:', smartForm); runSmartProgress(); };
+    let jobId: string;
+    try {
+      const resp = await startSmartSearch({
+        projectId:       smartForm.projectId,
+        instructionText: smartForm.description.trim(),
+      });
+      jobId = resp.jobId;
+      smartJobIdRef.current = jobId;
+    } catch (err) {
+      setSmartError(err instanceof Error ? err.message : 'Failed to start search.');
+      setSmartStage('idle');
+      return;
+    }
+
+    const POLL_MS       = 2500;
+    const MAX_ATTEMPTS  = 144;  // 144 × 2.5 s = 6 minutes
+    let   attempts      = 0;
+
+    smartPollRef.current = setInterval(async () => {
+      attempts++;
+      if (attempts > MAX_ATTEMPTS) {
+        clearInterval(smartPollRef.current!);
+        smartPollRef.current = null;
+        setSmartError('The search is taking longer than expected. The job may still complete — check the Leads page in a few minutes.');
+        setSmartStage('idle');
+        return;
+      }
+
+      try {
+        const status = await getSmartSearchStatus(jobId);
+
+        // Update parsed params as soon as they arrive
+        if (status.parsedParams) setSmartParsedParams(status.parsedParams);
+
+        // Update step indicator from backend stage
+        const stepIdx = stageToStep(status.stage);
+        if (stepIdx >= 0) {
+          setCurrentStep(stepIdx);
+          setCompletedSteps(prev => {
+            const next = new Set(prev);
+            for (let i = 0; i < stepIdx; i++) next.add(i);
+            return next;
+          });
+        }
+
+        // Show live detail for checking stage
+        if (status.progress?.detail) setSmartCheckDetail(status.progress.detail);
+
+        if (status.status === 'done') {
+          clearInterval(smartPollRef.current!);
+          smartPollRef.current = null;
+          // Mark all steps complete
+          setCompletedSteps(new Set([0, 1, 2, 3]));
+          setCurrentStep(-1);
+          const leads = status.results ?? [];
+          setResultLeads(leads);
+          setCheckedEmails(new Set(leads.map(l => l.email)));
+          setSmartSummary(status.summary ?? null);
+          setSmartStage(leads.length > 0 ? 'results' : 'results'); // always show results screen
+          return;
+        }
+
+        if (status.status === 'error') {
+          clearInterval(smartPollRef.current!);
+          smartPollRef.current = null;
+          setSmartError(status.error || 'The search failed on the server.');
+          setSmartStage('idle');
+        }
+      } catch (err) {
+        console.warn('[SmartSearch] Poll error (will retry):', err);
+      }
+    }, POLL_MS);
+  };
 
   // ─── Tab 2: results actions ───────────────────────────────────────────────────
 
-  const toggleLead = (id: string) => setCheckedIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  const toggleLead = (email: string) =>
+    setCheckedEmails(prev => { const next = new Set(prev); next.has(email) ? next.delete(email) : next.add(email); return next; });
 
-  const allChecked  = checkedIds.size === resultLeads.length;
-  const noneChecked = checkedIds.size === 0;
-  const handleSelectAll = () => setCheckedIds(allChecked ? new Set() : new Set(resultLeads.map(l => l.id)));
+  const allChecked  = resultLeads.length > 0 && checkedEmails.size === resultLeads.length;
+  const noneChecked = checkedEmails.size === 0;
+  const handleSelectAll = () =>
+    setCheckedEmails(allChecked ? new Set() : new Set(resultLeads.map(l => l.email)));
 
-  const handleSaveLeads = () => {
-    console.log('[LeadFinder] Saving leads:', resultLeads.filter(l => checkedIds.has(l.id)));
-    setSmartStage('saved');
-    setTimeout(() => {
-      setSmartStage('idle'); setSmartForm({ projectId: '', description: '' });
-      setResultLeads([]); setCheckedIds(new Set()); setCurrentStep(-1); setCompletedSteps(new Set());
-    }, 1800);
+  const handleSaveLeads = async () => {
+    if (smartSaving) return;
+    setSmartSaving(true);
+    try {
+      const selected = resultLeads.filter(l => checkedEmails.has(l.email)).map(l => l.email);
+      const result = await saveSmartSearch(smartJobIdRef.current, selected);
+      setSmartSaveResult(result);
+      setSmartStage('saved');
+    } catch (err) {
+      setSmartError(err instanceof Error ? err.message : 'Failed to save leads.');
+    } finally {
+      setSmartSaving(false);
+    }
   };
 
   const handleStartOver = () => {
-    setSmartStage('idle'); setResultLeads([]); setCheckedIds(new Set());
-    setCurrentStep(-1); setCompletedSteps(new Set());
+    if (smartPollRef.current) clearInterval(smartPollRef.current);
+    smartPollRef.current = null;
+    setSmartStage('idle');
+    setResultLeads([]);
+    setCheckedEmails(new Set());
+    setCurrentStep(-1);
+    setCompletedSteps(new Set());
+    setSmartParsedParams(null);
+    setSmartSummary(null);
+    setSmartError('');
+    setSmartSaveResult(null);
+    setSmartCheckDetail('');
   };
 
   // ─── Shared flag render ───────────────────────────────────────────────────────
@@ -840,6 +930,8 @@ export default function LeadFinderPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-white rounded-xl border border-gray-200 p-6">
                   <div className="space-y-5">
+
+                    {/* Project */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">Project <span className="text-red-500">*</span></label>
                       <select value={smartForm.projectId} onChange={e => setSmartForm(f => ({ ...f, projectId: e.target.value }))} disabled={projectsLoading}
@@ -848,15 +940,35 @@ export default function LeadFinderPage() {
                         <option value="">Select a project…</option>
                         {projects.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
                       </select>
+                      {projects.length === 0 && !projectsLoading && (
+                        <p className="mt-1 text-xs text-gray-400">No projects found — create one in Settings first.</p>
+                      )}
                     </div>
+
+                    {/* Description */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">Describe what you&apos;re looking for <span className="text-red-500">*</span></label>
                       <textarea value={smartForm.description} onChange={e => setSmartForm(f => ({ ...f, description: e.target.value }))} rows={5}
-                        placeholder="e.g. Find restaurants in Germany with outdated websites"
+                        placeholder="e.g. Find restaurants in Frankfurt with outdated websites"
                         className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent resize-none"
                       />
                       <p className="mt-1 text-xs text-gray-400">Be as specific as you like — include location, industry, website quality, size, etc.</p>
                     </div>
+
+                    {/* Error from previous run */}
+                    {smartError && (
+                      <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-lg px-3.5 py-3">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-red-500 shrink-0 mt-0.5">
+                          <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                        </svg>
+                        <div>
+                          <p className="text-sm font-medium text-red-800">Search failed</p>
+                          <p className="text-xs text-red-600 mt-0.5">{smartError}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Submit */}
                     <button onClick={handleSmartSearch} disabled={!canSmartSearch}
                       className="w-full flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors"
                     >
@@ -865,6 +977,7 @@ export default function LeadFinderPage() {
                       </svg>
                       Find Leads with AI
                     </button>
+
                     <div className="flex items-start gap-2.5 bg-blue-50 border border-blue-100 rounded-lg px-3.5 py-3">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600 mt-0.5 shrink-0">
                         <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
@@ -875,14 +988,17 @@ export default function LeadFinderPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* How it works panel */}
                 <div className="bg-white rounded-xl border border-gray-200 p-6">
                   <h3 className="text-base font-semibold text-gray-900 mb-1">How Smart Search works</h3>
-                  <p className="text-sm text-gray-400 mb-6">AI-powered lead discovery in three steps.</p>
+                  <p className="text-sm text-gray-400 mb-6">AI-powered lead discovery in four steps.</p>
                   <div className="space-y-5">
                     {[
-                      { step: '1', title: 'Understand your request', desc: 'The AI parses your description to extract industry, location, quality signals, and any special filters you mentioned.', color: 'bg-blue-100 text-blue-700' },
-                      { step: '2', title: 'Search & scrape', desc: 'It searches business directories, visits each website, and extracts contact info, emails, and quality indicators.', color: 'bg-purple-100 text-purple-700' },
-                      { step: '3', title: 'Filter & save', desc: 'Only businesses that genuinely match your criteria are saved to your leads list — no noise, no manual filtering.', color: 'bg-green-100 text-green-700' },
+                      { step: '1', title: 'Understand your request', desc: 'The AI extracts country, city, niche, and quality criteria from your description.', color: 'bg-blue-100 text-blue-700' },
+                      { step: '2', title: 'Search businesses', desc: 'Searches TomTom POI database for matching businesses with websites in your target location.', color: 'bg-purple-100 text-purple-700' },
+                      { step: '3', title: 'Check websites', desc: 'Visits each site to scrape the email address and extract quality signals (SSL, mobile, copyright year, etc.).', color: 'bg-amber-100 text-amber-700' },
+                      { step: '4', title: 'Filter & match', desc: 'AI evaluates each candidate against your criteria using the signals. Only matching leads are kept.', color: 'bg-green-100 text-green-700' },
                     ].map(({ step, title, desc, color }) => (
                       <div key={step} className="flex gap-4">
                         <div className={`flex-shrink-0 w-8 h-8 rounded-full ${color} flex items-center justify-center text-sm font-bold`}>{step}</div>
@@ -893,35 +1009,48 @@ export default function LeadFinderPage() {
                       </div>
                     ))}
                   </div>
-                  <div className="mt-8 flex items-center gap-2 p-3 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 shrink-0">
-                      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                    </svg>
-                    <p className="text-xs text-gray-500">Smart Search backend is being wired up. The UI is ready — full functionality coming in the next step.</p>
-                  </div>
                 </div>
               </div>
             )}
 
-            {/* ── RUNNING: animated progress steps ── */}
+            {/* ── RUNNING: real progress from backend ── */}
             {smartStage === 'running' && (
               <div className="max-w-xl mx-auto w-full">
                 <div className="bg-white rounded-xl border border-gray-200 p-8">
-                  <div className="flex items-center gap-3 mb-8">
-                    <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
+                  {/* Header */}
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center shrink-0">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent animate-spin" style={{ animationDuration: '2s' }}>
                         <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
                       </svg>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <h2 className="text-base font-semibold text-gray-900">AI is finding your leads</h2>
                       <p className="text-xs text-gray-400 mt-0.5 italic truncate max-w-xs">&ldquo;{smartForm.description}&rdquo;</p>
                     </div>
                   </div>
+
+                  {/* "Understood as" box — shown once parsedParams arrive */}
+                  {smartParsedParams && (
+                    <div className="mb-6 bg-gray-50 border border-gray-200 rounded-lg px-3.5 py-3">
+                      <p className="text-xs font-medium text-gray-600 mb-1.5">Understood your request as:</p>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-700">
+                        <span><span className="text-gray-400">Niche</span> {smartParsedParams.niche}</span>
+                        <span><span className="text-gray-400">Location</span> {smartParsedParams.city ? `${smartParsedParams.city}, ${smartParsedParams.country}` : smartParsedParams.country} {!smartParsedParams.city && <span className="text-gray-400">(all cities)</span>}</span>
+                        <span><span className="text-gray-400">Target</span> {smartParsedParams.leadsCount} leads</span>
+                        {smartParsedParams.criteria && <span><span className="text-gray-400">Criteria</span> {smartParsedParams.criteria}</span>}
+                        {!smartParsedParams.criteria && <span className="text-gray-400 italic">No quality criteria — all businesses accepted</span>}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step list */}
                   <div className="space-y-4">
                     {PROGRESS_STEPS.map((step, idx) => {
                       const isDone   = completedSteps.has(idx);
                       const isActive = currentStep === idx;
+                      // Show live detail for the checking step
+                      const detailLabel = isActive && idx === 2 && smartCheckDetail ? smartCheckDetail : step.label;
                       return (
                         <div key={step.id} className="flex items-center gap-4">
                           <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${isDone ? 'bg-green-100' : isActive ? 'bg-accent/10' : 'bg-gray-100'}`}>
@@ -933,28 +1062,37 @@ export default function LeadFinderPage() {
                             }
                           </div>
                           <span className={`text-sm transition-all duration-300 ${isDone ? 'text-gray-500 line-through' : isActive ? 'text-gray-900 font-semibold' : 'text-gray-400'}`}>
-                            {step.label}
+                            {detailLabel}
                           </span>
                         </div>
                       );
                     })}
                   </div>
+
+                  {/* Progress bar */}
                   <div className="mt-8 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                     <div className="h-full bg-accent rounded-full transition-all duration-700 ease-out"
                       style={{ width: `${((completedSteps.size + (currentStep >= 0 ? 0.5 : 0)) / PROGRESS_STEPS.length) * 100}%` }}
                     />
                   </div>
-                  <p className="text-xs text-gray-400 mt-2 text-center">Step {Math.min(currentStep + 1, PROGRESS_STEPS.length)} of {PROGRESS_STEPS.length}</p>
+                  <p className="text-xs text-gray-400 mt-2 text-center">
+                    {currentStep >= 0 ? `Step ${currentStep + 1} of ${PROGRESS_STEPS.length}` : 'Finishing up…'}
+                  </p>
                 </div>
               </div>
             )}
 
-            {/* ── RESULTS: review and save ── */}
+            {/* ── RESULTS: review real leads ── */}
             {smartStage === 'results' && (
               <div className="space-y-4">
+                {/* Header */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">Found {resultLeads.length} matching leads</h2>
+                    <h2 className="text-xl font-bold text-gray-900">
+                      {resultLeads.length > 0
+                        ? `Found ${resultLeads.length} matching lead${resultLeads.length !== 1 ? 's' : ''}`
+                        : 'No matching leads found'}
+                    </h2>
                     <p className="text-sm text-gray-400 mt-0.5 italic">&ldquo;{smartForm.description}&rdquo;</p>
                   </div>
                   <button onClick={handleStartOver}
@@ -966,64 +1104,156 @@ export default function LeadFinderPage() {
                     Start Over
                   </button>
                 </div>
-                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
-                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                      <input type="checkbox" checked={allChecked}
-                        ref={el => { if (el) el.indeterminate = !allChecked && !noneChecked; }}
-                        onChange={handleSelectAll}
-                        className="w-4 h-4 rounded border-gray-300 text-accent focus:ring-accent/30 cursor-pointer"
-                      />
-                      <span className="text-sm font-medium text-gray-700">{allChecked ? 'Deselect All' : 'Select All'}</span>
-                    </label>
-                    <span className="text-xs text-gray-500">{checkedIds.size} of {resultLeads.length} selected</span>
+
+                {/* "Understood as" box */}
+                {smartParsedParams && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-700">
+                    <span className="font-medium text-gray-500 shrink-0">Understood as:</span>
+                    <span><span className="text-gray-400">Niche</span> <span className="font-medium">{smartParsedParams.niche}</span></span>
+                    <span><span className="text-gray-400">Location</span> <span className="font-medium">{smartParsedParams.city ? `${smartParsedParams.city}, ${smartParsedParams.country}` : smartParsedParams.country}</span></span>
+                    {smartParsedParams.criteria
+                      ? <span><span className="text-gray-400">Criteria</span> <span className="font-medium">{smartParsedParams.criteria}</span></span>
+                      : <span className="text-gray-400 italic">No quality criteria</span>}
                   </div>
-                  <div className="divide-y divide-gray-100">
-                    {resultLeads.map(lead => {
-                      const checked = checkedIds.has(lead.id);
-                      return (
-                        <div key={lead.id} onClick={() => toggleLead(lead.id)}
-                          className={`flex items-start gap-4 px-5 py-4 transition-colors cursor-pointer ${checked ? 'bg-white hover:bg-gray-50' : 'bg-gray-50/60 hover:bg-gray-50'}`}
-                        >
-                          <div className="pt-0.5 shrink-0">
-                            <input type="checkbox" checked={checked} onChange={() => toggleLead(lead.id)} onClick={e => e.stopPropagation()}
-                              className="w-4 h-4 rounded border-gray-300 text-accent focus:ring-accent/30 cursor-pointer"
-                            />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-baseline gap-3 flex-wrap">
-                              <span className={`text-sm font-semibold ${checked ? 'text-gray-900' : 'text-gray-400'}`}>{lead.company}</span>
-                              <a href={`https://${lead.website}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-                                className="text-xs text-accent hover:underline truncate">{lead.website}</a>
-                              <span className={`text-xs ${checked ? 'text-gray-500' : 'text-gray-400'}`}>{lead.email}</span>
-                            </div>
-                            <div className="mt-1.5 flex items-center gap-1.5">
-                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500 shrink-0">
-                                <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
-                              </svg>
-                              <span className="text-[11px] text-gray-400 italic">{lead.reason}</span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                )}
+
+                {/* Summary stats */}
+                {smartSummary && (
+                  <div className="text-sm text-gray-600 bg-white border border-gray-200 rounded-lg px-4 py-3 flex flex-wrap gap-x-4 gap-y-1">
+                    <span>Checked <strong>{smartSummary.checked}</strong> businesses</span>
+                    <span className="text-gray-300">·</span>
+                    <span><strong>{smartSummary.withEmail}</strong> had an email</span>
+                    <span className="text-gray-300">·</span>
+                    <span><strong>{smartSummary.matched}</strong> matched your criteria</span>
                   </div>
-                  <div className="flex items-center justify-between px-5 py-4 border-t border-gray-100 bg-gray-50">
-                    <button onClick={handleStartOver} className="text-sm text-gray-500 hover:text-gray-700 transition-colors">Cancel</button>
-                    <button onClick={handleSaveLeads} disabled={checkedIds.size === 0}
-                      className="flex items-center gap-2 bg-accent hover:bg-accent-hover disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+                )}
+
+                {/* Stopped early notice */}
+                {smartSummary?.stoppedEarlyReason && (
+                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3.5 py-3">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-600 shrink-0 mt-0.5">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    <p className="text-xs text-amber-800">
+                      {smartSummary.stoppedEarlyReason === 'rate_limit'
+                        ? 'Search stopped early — TomTom API quota reached. Results may be fewer than requested.'
+                        : `Search stopped early: ${smartSummary.stoppedEarlyReason}`}
+                    </p>
+                  </div>
+                )}
+
+                {/* Zero results empty state */}
+                {resultLeads.length === 0 ? (
+                  <div className="bg-white rounded-xl border border-gray-200 p-10 flex flex-col items-center text-center">
+                    <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
                       </svg>
-                      Save {checkedIds.size} Lead{checkedIds.size !== 1 ? 's' : ''} to Batch
-                    </button>
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-800 mb-1">No matches found</h3>
+                    <p className="text-sm text-gray-500 max-w-xs">
+                      {smartParsedParams?.criteria
+                        ? 'Your criteria is strict — none of the businesses found matched it. Try a broader description, remove the quality filter, or try a different city.'
+                        : 'No businesses with usable emails were found for this location and niche. Try a broader search.'}
+                    </p>
+                    <button onClick={handleStartOver} className="mt-5 text-sm text-accent hover:underline font-medium">Try a different search</button>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    {/* Strict criteria hint */}
+                    {smartSummary && smartParsedParams && smartSummary.matched < smartParsedParams.leadsCount && smartParsedParams.criteria && (
+                      <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3.5 py-2.5">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500 shrink-0 mt-0.5">
+                          <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                        </svg>
+                        <p className="text-xs text-blue-700">Your criteria is strict, so fewer leads matched. Try loosening it to get more.</p>
+                      </div>
+                    )}
+
+                    {/* Error from save attempt */}
+                    {smartError && (
+                      <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-lg px-3.5 py-3">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-red-500 shrink-0 mt-0.5">
+                          <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                        </svg>
+                        <p className="text-sm text-red-700">{smartError}</p>
+                      </div>
+                    )}
+
+                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                      {/* Select all header */}
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
+                        <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                          <input type="checkbox" checked={allChecked}
+                            ref={el => { if (el) el.indeterminate = !allChecked && !noneChecked; }}
+                            onChange={handleSelectAll}
+                            className="w-4 h-4 rounded border-gray-300 text-accent focus:ring-accent/30 cursor-pointer"
+                          />
+                          <span className="text-sm font-medium text-gray-700">{allChecked ? 'Deselect All' : 'Select All'}</span>
+                        </label>
+                        <span className="text-xs text-gray-500">{checkedEmails.size} of {resultLeads.length} selected</span>
+                      </div>
+
+                      {/* Lead rows */}
+                      <div className="divide-y divide-gray-100">
+                        {resultLeads.map((lead, idx) => {
+                          const checked = checkedEmails.has(lead.email);
+                          return (
+                            <div key={idx} onClick={() => toggleLead(lead.email)}
+                              className={`flex items-start gap-4 px-5 py-4 transition-colors cursor-pointer ${checked ? 'bg-white hover:bg-gray-50' : 'bg-gray-50/60 hover:bg-gray-50'}`}
+                            >
+                              <div className="pt-0.5 shrink-0">
+                                <input type="checkbox" checked={checked}
+                                  onChange={() => toggleLead(lead.email)}
+                                  onClick={e => e.stopPropagation()}
+                                  className="w-4 h-4 rounded border-gray-300 text-accent focus:ring-accent/30 cursor-pointer"
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-baseline gap-3 flex-wrap">
+                                  <span className={`text-sm font-semibold ${checked ? 'text-gray-900' : 'text-gray-400'}`}>{lead.company}</span>
+                                  <a href={lead.website} target="_blank" rel="noopener noreferrer"
+                                    onClick={e => e.stopPropagation()}
+                                    className="text-xs text-accent hover:underline truncate max-w-[180px]"
+                                  >
+                                    {lead.website.replace(/^https?:\/\//, '')}
+                                  </a>
+                                  <span className={`text-xs ${checked ? 'text-gray-500' : 'text-gray-400'}`}>{lead.email}</span>
+                                </div>
+                                {lead.reason && (
+                                  <div className="mt-1.5 flex items-center gap-1.5">
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500 shrink-0">
+                                      <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+                                    </svg>
+                                    <span className="text-[11px] text-gray-400 italic">{lead.reason}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Footer actions */}
+                      <div className="flex items-center justify-between px-5 py-4 border-t border-gray-100 bg-gray-50">
+                        <button onClick={handleStartOver} className="text-sm text-gray-500 hover:text-gray-700 transition-colors">Cancel</button>
+                        <button onClick={handleSaveLeads}
+                          disabled={noneChecked || smartSaving}
+                          className="flex items-center gap-2 bg-accent hover:bg-accent-hover disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
+                        >
+                          {smartSaving
+                            ? <><svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>Saving…</>
+                            : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Save {checkedEmails.size} Lead{checkedEmails.size !== 1 ? 's' : ''} to Batch</>
+                          }
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
-            {/* ── SAVED: flash success ── */}
+            {/* ── SAVED: success screen ── */}
             {smartStage === 'saved' && (
               <div className="max-w-xl mx-auto w-full">
                 <div className="bg-white rounded-xl border border-gray-200 p-10 flex flex-col items-center text-center">
@@ -1032,9 +1262,26 @@ export default function LeadFinderPage() {
                       <polyline points="20 6 9 17 4 12"/>
                     </svg>
                   </div>
-                  <h2 className="text-lg font-bold text-gray-900 mb-1">Leads saved!</h2>
-                  <p className="text-sm text-gray-500">Your selected leads have been added to a new batch. Find them in the Leads page.</p>
-                  <p className="text-xs text-gray-400 mt-3">Resetting in a moment…</p>
+                  <h2 className="text-lg font-bold text-gray-900 mb-1">
+                    {smartSaveResult ? `${smartSaveResult.savedCount} lead${smartSaveResult.savedCount !== 1 ? 's' : ''} saved!` : 'Leads saved!'}
+                  </h2>
+                  {smartSaveResult && (
+                    <p className="text-sm text-gray-500 mb-1">
+                      Saved to batch &quot;{smartSaveResult.batchName}&quot;
+                    </p>
+                  )}
+                  <p className="text-sm text-gray-400">Find them in the Leads page.</p>
+                  <div className="mt-5 flex gap-3">
+                    <a href="/leads" className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-accent hover:bg-accent-hover px-4 py-2 rounded-lg transition-colors">
+                      View in Leads
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                      </svg>
+                    </a>
+                    <button onClick={handleStartOver} className="text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-4 py-2 bg-white hover:bg-gray-50 transition-colors">
+                      New Search
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
