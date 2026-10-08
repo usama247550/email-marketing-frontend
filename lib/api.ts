@@ -638,6 +638,8 @@ export interface SmartSearchParsedParams {
   niche:      string;
   criteria:   string | null;
   leadsCount: number;
+  nicheTerms?: string[];
+  cities?:     string[];
 }
 
 export interface SmartSearchLead {
@@ -646,24 +648,29 @@ export interface SmartSearchLead {
   website: string;
   email:   string;
   niche:   string;
+  score:   number;  // 0-100 quality score from AI
   reason:  string;
 }
 
 export interface SmartSearchSummary {
   candidatesFound:    number;
-  checked:            number;
+  homepagesChecked:   number;
+  passedPrefilter:    number;
   withEmail:          number;
   matched:            number;
   tomtomCallCount:    number;
   stoppedEarlyReason: string | null;
+  totalElapsedSec?:   number;
 }
 
 export interface SmartSearchProgress {
-  stage:           string;
-  detail:          string;
-  total?:          number;
-  checked?:        number;
-  candidatesFound?: number;
+  stage:             string;
+  detail:            string;
+  total?:            number;
+  homepagesChecked?: number;
+  passedPrefilter?:  number;
+  withEmail?:        number;
+  candidatesFound?:  number;
 }
 
 export interface SmartJobStatus {
@@ -672,10 +679,10 @@ export interface SmartJobStatus {
   stage:        string;
   startedAt:    string;
   finishedAt:   string | null;
-  params:       { projectId: string; instructionText: string };
+  params:       { projectId: string; instructionText: string; leadsCount: number; strictness: string };
   parsedParams: SmartSearchParsedParams | null;
   progress:     SmartSearchProgress;
-  results?:     SmartSearchLead[];
+  results?:     SmartSearchLead[];   // present while running too (partial)
   summary?:     SmartSearchSummary;
   error?:       string;
   saved?:       boolean;
@@ -688,6 +695,8 @@ export interface SmartJobStatus {
 export async function startSmartSearch(payload: {
   projectId:       string;
   instructionText: string;
+  leadsCount:      number;
+  strictness:      string;
 }): Promise<{ jobId: string }> {
   const res = await fetch(`${API_BASE}/api/lead-finder/smart-search`, {
     method:  'POST',
@@ -734,6 +743,21 @@ export async function saveSmartSearch(
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Save failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+/**
+ * POST /api/lead-finder/smart-search/:jobId/stop
+ * Requests a graceful stop; pipeline finishes current batch and completes with partial results.
+ */
+export async function stopSmartSearch(jobId: string): Promise<{ success: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/api/lead-finder/smart-search/${encodeURIComponent(jobId)}/stop`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Stop failed: ${res.status}`);
   }
   return res.json();
 }
