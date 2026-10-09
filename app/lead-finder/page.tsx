@@ -6,14 +6,16 @@ import { FALLBACK_COUNTRIES, type StaticCountry } from '@/lib/countries';
 import {
   getProjects,
   triggerMultiNicheSearch,
-  pollLeadFinderJob,
+  pollMultiNicheJob,
+  stopMultiNicheSearch,
   startSmartSearch,
   getSmartSearchStatus,
   saveSmartSearch,
   stopSmartSearch,
   type Project,
   type MultiNicheSearchResult,
-  type LeadFinderJobProgress,
+  type MultiNicheJobProgress,
+  type MultiNicheRoundStats,
   type SmartSearchLead,
   type RejectedLead,
   type SmartSearchParsedParams,
@@ -79,9 +81,16 @@ export default function LeadFinderPage() {
   const [multiStage, setMultiStage]       = useState<MultiStage>('idle');
   const [multiResult, setMultiResult]     = useState<MultiNicheSearchResult | null>(null);
   const [multiError, setMultiError]       = useState<string>('');
-  const [multiProgress, setMultiProgress] = useState<LeadFinderJobProgress | null>(null);
+  const [multiProgress, setMultiProgress] = useState<MultiNicheJobProgress | null>(null);
+  const [multiSavedSoFar, setMultiSavedSoFar] = useState(0);
+  const [multiRounds, setMultiRounds]     = useState<MultiNicheRoundStats[]>([]);
+  const [multiBatchId, setMultiBatchId]   = useState<string | null>(null);
+  const [multiBatchName, setMultiBatchName] = useState<string | null>(null);
+  const [multiElapsed, setMultiElapsed]   = useState(0);
+  const multiJobIdRef    = useRef<string>('');
   // Stable ref to the poll-interval timer so we can clear it from anywhere
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollTimerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
+  const multiElapsedRef  = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Tab 2: Smart Search ──────────────────────────────────────────────────────
   const [smartForm, setSmartForm] = useState({
@@ -115,6 +124,7 @@ export default function LeadFinderPage() {
       if (smartPollRef.current)    clearInterval(smartPollRef.current);
       if (smartElapsedRef.current) clearInterval(smartElapsedRef.current);
       if (pollTimerRef.current)    clearInterval(pollTimerRef.current);
+      if (multiElapsedRef.current) clearInterval(multiElapsedRef.current);
     };
   }, []);
 
@@ -233,12 +243,18 @@ export default function LeadFinderPage() {
     (allCities || multiForm.city.trim() !== '') && multiForm.niches.length > 0;
 
   const handleFindLeads = async () => {
-    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    if (pollTimerRef.current)    clearInterval(pollTimerRef.current);
+    if (multiElapsedRef.current) clearInterval(multiElapsedRef.current);
 
     setMultiStage('loading');
     setMultiResult(null);
     setMultiError('');
     setMultiProgress(null);
+    setMultiSavedSoFar(0);
+    setMultiRounds([]);
+    setMultiBatchId(null);
+    setMultiBatchName(null);
+    setMultiElapsed(0);
 
     let jobId: string;
     try {
@@ -250,52 +266,64 @@ export default function LeadFinderPage() {
         totalLeads: multiForm.totalLeads,
       });
       jobId = startResp.jobId;
+      multiJobIdRef.current = jobId;
     } catch (err) {
       setMultiError(err instanceof Error ? err.message : 'Failed to start search.');
       setMultiStage('error');
       return;
     }
 
-    const POLL_INTERVAL_MS  = 2500;
-    const MAX_POLL_ATTEMPTS = 120;  // 120 × 2.5 s = 5 minutes max
-    let   attempts          = 0;
+    // Elapsed timer — ticks every second, purely cosmetic
+    const jobStartTs = Date.now();
+    multiElapsedRef.current = setInterval(() => {
+      setMultiElapsed(Math.floor((Date.now() - jobStartTs) / 1000));
+    }, 1000);
+
+    const POLL_MS = 3000;  // poll every 3 s
 
     pollTimerRef.current = setInterval(async () => {
-      attempts++;
-
-      if (attempts > MAX_POLL_ATTEMPTS) {
-        clearInterval(pollTimerRef.current!);
-        pollTimerRef.current = null;
-        setMultiError(
-          'The search is taking longer than expected. Check the Leads page in a few minutes — the batch may still complete in the background.'
-        );
-        setMultiStage('error');
-        return;
-      }
-
       try {
-        const status = await pollLeadFinderJob(jobId);
+        const status = await pollMultiNicheJob(jobId);
 
+        // Live progress
         if (status.progress) setMultiProgress(status.progress);
+        if (status.savedSoFar != null) setMultiSavedSoFar(status.savedSoFar);
+        if (status.rounds?.length)     setMultiRounds(status.rounds);
+        if (status.batchId)            setMultiBatchId(status.batchId);
+        if (status.batchName)          setMultiBatchName(status.batchName);
 
-        if (status.status === 'done' && status.result) {
-          clearInterval(pollTimerRef.current!);
-          pollTimerRef.current = null;
-          setMultiResult(status.result);
+        if (status.status === 'done') {
+          clearInterval(pollTimerRef.current!);   pollTimerRef.current    = null;
+          clearInterval(multiElapsedRef.current!); multiElapsedRef.current = null;
+          setMultiResult(status.result ?? null);
           setMultiStage('done');
           return;
         }
 
+        // Only show error when the backend explicitly says error
         if (status.status === 'error') {
-          clearInterval(pollTimerRef.current!);
-          pollTimerRef.current = null;
+          clearInterval(pollTimerRef.current!);   pollTimerRef.current    = null;
+          clearInterval(multiElapsedRef.current!); multiElapsedRef.current = null;
           setMultiError(status.error || 'The search failed on the server.');
           setMultiStage('error');
         }
+        // 'running' → keep polling indefinitely (no client-side timeout)
       } catch (err) {
+        // Transient network error — skip this tick, keep polling
         console.warn('[LeadFinder] Poll error (will retry):', err);
       }
-    }, POLL_INTERVAL_MS);
+    }, POLL_MS);
+  };
+
+  const handleStopMultiSearch = async () => {
+    if (!multiJobIdRef.current) return;
+    try {
+      const resp = await stopMultiNicheSearch(multiJobIdRef.current);
+      if (resp.savedSoFar != null) setMultiSavedSoFar(resp.savedSoFar);
+    } catch (err) {
+      console.warn('[LeadFinder] Stop request failed:', err);
+    }
+    // Keep polling — backend will finish its current scrape batch, save, and complete
   };
 
   // ─── Tab 2: Smart Search helpers ─────────────────────────────────────────────
@@ -751,39 +779,76 @@ export default function LeadFinderPage() {
                   ) : multiForm.niches.length > 1 ? `Find Leads across ${multiForm.niches.length} Niches` : 'Find Leads'}
                 </button>
 
-                {/* Loading state: live progress */}
+                {/* Loading state: round-aware live progress */}
                 {multiStage === 'loading' && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg px-3.5 py-3.5 space-y-3">
-                    <div className="flex items-center gap-2.5">
-                      <svg className="animate-spin h-4 w-4 text-blue-500 shrink-0" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                      </svg>
-                      <p className="text-sm font-medium text-blue-800">
-                        {multiProgress ? `Searching "${multiProgress.currentNiche}"…` : 'Starting search…'}
-                      </p>
-                    </div>
-                    {multiProgress && (
-                      <div className="flex items-center gap-4 text-xs text-blue-700 font-medium">
-                        <span><span className="text-blue-900 font-bold tabular-nums">{multiProgress.checked}</span> businesses checked</span>
-                        <span className="text-blue-400">·</span>
-                        <span><span className="text-blue-900 font-bold tabular-nums">{multiProgress.validFound}</span> valid leads found</span>
-                        <span className="text-blue-400">·</span>
-                        <span>target: {multiProgress.target}</span>
+                    {/* Header row */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <svg className="animate-spin h-4 w-4 text-blue-500 shrink-0" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                        </svg>
+                        <p className="text-sm font-medium text-blue-800 truncate">
+                          {multiProgress
+                            ? multiProgress.phase === 'collecting'
+                              ? `Round ${multiProgress.round} — collecting "${multiProgress.currentNiche}"…`
+                              : multiProgress.phase === 'scraping'
+                                ? `Round ${multiProgress.round} — scraping ${multiProgress.roundCandidates} sites…`
+                                : multiProgress.phase === 'round_done'
+                                  ? `Round ${multiProgress.round} complete`
+                                  : 'Starting search…'
+                            : 'Starting search…'
+                          }
+                        </p>
                       </div>
-                    )}
+                      <span className="text-xs font-mono text-blue-400 tabular-nums shrink-0 ml-2">
+                        {formatElapsed(multiElapsed)}
+                      </span>
+                    </div>
+
+                    {/* Saved counter + round */}
+                    <div className="flex items-center gap-4 text-xs text-blue-700 font-medium">
+                      <span>
+                        <span className="text-blue-900 font-bold tabular-nums">{multiSavedSoFar}</span>
+                        {' '}of{' '}
+                        <span className="tabular-nums">{multiForm.totalLeads}</span>
+                        {' '}saved
+                      </span>
+                      {multiProgress && multiProgress.round > 0 && (
+                        <>
+                          <span className="text-blue-300">·</span>
+                          <span>Round {multiProgress.round} of 3</span>
+                        </>
+                      )}
+                      {multiBatchId && (
+                        <>
+                          <span className="text-blue-300">·</span>
+                          <span className="text-green-600">batch created ✓</span>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Progress bar */}
                     <div className="h-1.5 bg-blue-200 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-blue-500 rounded-full transition-all duration-700 ease-out"
-                        style={{ width: multiProgress && multiProgress.target > 0 ? `${Math.min(100, Math.round((multiProgress.validFound / multiProgress.target) * 100))}%` : '4%' }}
+                        style={{ width: multiForm.totalLeads > 0 ? `${Math.min(100, Math.round((multiSavedSoFar / multiForm.totalLeads) * 100))}%` : '4%' }}
                       />
                     </div>
-                    <p className="text-xs text-blue-600">
-                      {multiProgress
-                        ? `${Math.min(100, Math.round((multiProgress.validFound / multiProgress.target) * 100))}% of target · scraping websites for emails`
-                        : `Querying TomTom across ${multiForm.niches.length} niche${multiForm.niches.length > 1 ? 's' : ''} in ${allCities ? multiForm.country : `${multiForm.city}, ${multiForm.country}`}…`
-                      }
-                    </p>
+
+                    {/* Stop button */}
+                    <div className="flex justify-end pt-1">
+                      <button
+                        onClick={handleStopMultiSearch}
+                        className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 border border-blue-300 hover:border-blue-500 rounded-md px-2.5 py-1.5 bg-white hover:bg-blue-50 transition-colors"
+                      >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                          <rect x="4" y="4" width="16" height="16" rx="2"/>
+                        </svg>
+                        Stop and keep results so far
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -796,53 +861,66 @@ export default function LeadFinderPage() {
                       </svg>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-green-800">
-                          Found {multiResult.totalFound} valid lead{multiResult.totalFound !== 1 ? 's' : ''} across {multiForm.niches.length} niche{multiForm.niches.length !== 1 ? 's' : ''}
+                          {multiResult.totalFound > 0
+                            ? `Saved ${multiResult.totalFound} lead${multiResult.totalFound !== 1 ? 's' : ''} across ${multiForm.niches.length} niche${multiForm.niches.length !== 1 ? 's' : ''}`
+                            : 'Search complete — no leads found'}
                         </p>
                         <p className="text-xs text-green-700 mt-0.5">
-                          Checked {multiResult.checkedCount} businesses · {multiResult.tomtomCallCount} TomTom API calls · saved to a new batch
+                          {multiResult.checkedCount} sites scraped · {multiResult.tomtomCallCount} TomTom calls · {multiResult.rounds.length} round{multiResult.rounds.length !== 1 ? 's' : ''}
+                          {multiResult.totalElapsedSec != null && ` · ${formatElapsed(multiResult.totalElapsedSec)}`}
                         </p>
                       </div>
                     </div>
 
-                    {multiResult.stopReason && (
+                    {/* Stop reason — in plain words */}
+                    {multiResult.stopReason && multiResult.stopReason !== 'target_reached' && (
                       <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-2">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-600 shrink-0 mt-0.5">
                           <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                         </svg>
                         <p className="text-xs text-amber-800">
-                          {multiResult.stopReason === 'rate_limit'
-                            ? `Search stopped early — TomTom API quota reached. Got ${multiResult.totalFound} of ${multiForm.totalLeads} requested leads.`
-                            : `Search reached the per-niche business cap. Got ${multiResult.totalFound} of ${multiForm.totalLeads} requested leads.`
-                          }
+                          {{
+                            'rate_limit':            `TomTom API quota reached. Got ${multiResult.totalFound} of ${multiForm.totalLeads} requested.`,
+                            'cancelled':             `Stopped early at your request. Saved ${multiResult.totalFound} of ${multiForm.totalLeads}.`,
+                            'time_limit':            `6-minute time limit reached. Saved ${multiResult.totalFound} of ${multiForm.totalLeads}.`,
+                            'no_new_leads':          `Last round found no new leads — search stopped early. Saved ${multiResult.totalFound} of ${multiForm.totalLeads}.`,
+                            'all_niches_exhausted':  `TomTom has no more results for these niches. Saved ${multiResult.totalFound} of ${multiForm.totalLeads}.`,
+                            'no_candidates':         `No new candidates found. Saved ${multiResult.totalFound} of ${multiForm.totalLeads}.`,
+                            '3_rounds_done':         `Completed 3 rounds. Saved ${multiResult.totalFound} of ${multiForm.totalLeads}.`,
+                          }[multiResult.stopReason] ?? `Stopped: ${multiResult.stopReason}. Saved ${multiResult.totalFound} of ${multiForm.totalLeads}.`}
                         </p>
                       </div>
                     )}
 
-                    {multiResult.perNicheBreakdown.length > 1 && (
+                    {/* Per-round breakdown */}
+                    {multiResult.rounds.length > 0 && (
                       <div className="ml-6 space-y-1">
-                        {multiResult.perNicheBreakdown.map(nb => (
-                          <div key={nb.niche} className="flex items-center justify-between text-xs text-green-700">
-                            <span className="font-medium">
-                              {nb.niche}
-                              {nb.skipped && <span className="ml-1 text-amber-600">(skipped)</span>}
-                              {nb.stoppedEarly && !nb.skipped && <span className="ml-1 text-amber-600">(stopped early)</span>}
-                            </span>
-                            <span>{nb.skipped ? '—' : `${nb.validFound} valid from ${nb.totalChecked} checked`}</span>
+                        {multiResult.rounds.map(r => (
+                          <div key={r.round} className="flex items-center justify-between text-xs text-green-700">
+                            <span className="font-medium">Round {r.round}</span>
+                            <span>{r.validFound} saved · {r.scraped} scraped · {r.elapsedSec}s</span>
                           </div>
                         ))}
                       </div>
                     )}
 
-                    <div className="ml-6">
-                      <a href={`/leads?batch=${multiResult.batchId}`}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-700 hover:text-green-900 underline underline-offset-2"
-                      >
-                        View batch in Leads
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M5 12h14M12 5l7 7-7 7"/>
-                        </svg>
-                      </a>
-                    </div>
+                    {/* Batch link — only if leads were saved */}
+                    {multiResult.totalFound > 0 && multiResult.batchId && (
+                      <div className="ml-6">
+                        <a href={`/leads?batch=${multiResult.batchId}`}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-700 hover:text-green-900 underline underline-offset-2"
+                        >
+                          View &ldquo;{multiResult.batchName || 'batch'}&rdquo; in Leads
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                          </svg>
+                        </a>
+                      </div>
+                    )}
+
+                    {multiResult.totalFound === 0 && (
+                      <p className="ml-6 text-xs text-gray-500">No batch was created because no valid leads were found.</p>
+                    )}
                   </div>
                 )}
 

@@ -558,39 +558,63 @@ export interface MultiNicheSearchPayload {
   totalLeads: number;
 }
 
+/** Per-round stats returned by the backend in job.rounds[] */
+export interface MultiNicheRoundStats {
+  round:      number;
+  candidates: number;
+  scraped:    number;
+  validFound: number;
+  saved:      number;   // cumulative saved after this round
+  remaining:  number;
+  elapsedSec: number;
+}
+
 export interface NicheBreakdown {
-  niche:         string;
-  validFound:    number;   // valid leads with email
-  totalChecked:  number;   // total businesses checked from TomTom
-  skipped?:      boolean;  // niche was skipped because rate limit hit earlier
-  stoppedEarly?: 'cap_hit' | 'rate_limit';
+  niche:        string;
+  validFound:   number;
+  totalChecked: number;
+  exhausted?:   boolean;
+}
+
+/** Shape returned by GET /status/:jobId while running and when done for multi_niche jobs */
+export interface MultiNicheJobStatus {
+  type:        'multi_niche';
+  status:      'running' | 'done' | 'error';
+  startedAt:   string;
+  finishedAt:  string | null;
+  params:      MultiNicheSearchPayload;
+  progress:    MultiNicheJobProgress;
+  savedSoFar:  number;
+  rounds:      MultiNicheRoundStats[];
+  batchId?:    string;    // present as soon as first lead is saved
+  batchName?:  string;
+  result?:     MultiNicheSearchResult;
+  error?:      string;
+}
+
+export interface MultiNicheJobProgress {
+  round:           number;
+  phase:           string;   // 'collecting' | 'scraping' | 'round_done' | 'starting'
+  currentNiche:    string;
+  savedSoFar:      number;
+  target:          number;
+  roundCandidates: number;
+  roundScraped:    number;
+  roundValid:      number;
 }
 
 export interface MultiNicheSearchResult {
-  batchId:           string;
-  totalFound:        number;  // valid leads saved
-  validCount:        number;
-  checkedCount:      number;  // total businesses checked across all niches
-  tomtomCallCount:   number;  // total TomTom API calls made this run
-  stopReason:        'rate_limit' | 'cap_hit' | null;  // null = completed normally
-  perNicheBreakdown: NicheBreakdown[];
-}
-
-export interface LeadFinderJobProgress {
-  checked:      number;   // total businesses checked so far (across all niches)
-  validFound:   number;   // valid emails found so far
-  target:       number;   // total valid leads requested
-  currentNiche: string;   // niche currently being processed
-}
-
-export interface LeadFinderJobStatus {
-  status:     'running' | 'done' | 'error';
-  startedAt:  string;
-  finishedAt: string | null;
-  params:     MultiNicheSearchPayload;
-  progress:   LeadFinderJobProgress;  // always present — live counts while running
-  result?:    MultiNicheSearchResult;
-  error?:     string;
+  batchId:            string | null;
+  batchName:          string | null;
+  totalFound:         number;
+  validCount:         number;
+  checkedCount:       number;
+  tomtomCallCount:    number;
+  stopReason:         string | null;
+  rounds:             MultiNicheRoundStats[];
+  totalElapsedSec:    number;
+  fetchErrorCounts?:  Record<string, number>;
+  perNicheBreakdown:  NicheBreakdown[];
 }
 
 /**
@@ -615,11 +639,10 @@ export async function triggerMultiNicheSearch(
 }
 
 /**
- * GET /api/lead-finder/status/:jobId
- * Returns the current status of a running or finished job.
- * Works for both multi-niche and smart search jobs.
+ * GET /api/lead-finder/status/:jobId  (multi-niche variant)
+ * Returns the current status of a running or finished multi-niche job.
  */
-export async function pollLeadFinderJob(jobId: string): Promise<LeadFinderJobStatus> {
+export async function pollMultiNicheJob(jobId: string): Promise<MultiNicheJobStatus> {
   const res = await fetch(`${API_BASE}/api/lead-finder/status/${encodeURIComponent(jobId)}`, {
     cache: 'no-store',
   });
@@ -628,6 +651,30 @@ export async function pollLeadFinderJob(jobId: string): Promise<LeadFinderJobSta
     throw new Error(err.error || `Status check failed: ${res.status}`);
   }
   return res.json();
+}
+
+/**
+ * POST /api/lead-finder/multi-niche-search/:jobId/stop
+ * Graceful stop — finishes current scrape batch, saves found leads, completes.
+ */
+export async function stopMultiNicheSearch(
+  jobId: string,
+): Promise<{ success: boolean; message: string; savedSoFar: number; batchId?: string }> {
+  const res = await fetch(
+    `${API_BASE}/api/lead-finder/multi-niche-search/${encodeURIComponent(jobId)}/stop`,
+    { method: 'POST' },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Stop failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+// Keep old pollLeadFinderJob as an alias so any other callers don't break
+/** @deprecated Use pollMultiNicheJob for multi-niche jobs */
+export async function pollLeadFinderJob(jobId: string): Promise<MultiNicheJobStatus> {
+  return pollMultiNicheJob(jobId);
 }
 
 // ── Smart Search API functions ────────────────────────────────────────────────
