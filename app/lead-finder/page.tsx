@@ -15,6 +15,7 @@ import {
   type MultiNicheSearchResult,
   type LeadFinderJobProgress,
   type SmartSearchLead,
+  type RejectedLead,
   type SmartSearchParsedParams,
   type SmartSearchSummary,
 } from '@/lib/api';
@@ -93,6 +94,8 @@ export default function LeadFinderPage() {
   const [currentStep, setCurrentStep]           = useState(-1);
   const [completedSteps, setCompletedSteps]     = useState<Set<number>>(new Set());
   const [resultLeads, setResultLeads]           = useState<SmartSearchLead[]>([]);
+  const [rejectedLeads, setRejectedLeads]       = useState<RejectedLead[]>([]);
+  const [rejectedOpen, setRejectedOpen]         = useState(false);
   const [checkedEmails, setCheckedEmails]       = useState<Set<string>>(new Set());
   const [smartParsedParams, setSmartParsedParams] = useState<SmartSearchParsedParams | null>(null);
   const [smartSummary, setSmartSummary]         = useState<SmartSearchSummary | null>(null);
@@ -331,6 +334,8 @@ export default function LeadFinderPage() {
     setCurrentStep(0);
     setCompletedSteps(new Set());
     setResultLeads([]);
+    setRejectedLeads([]);
+    setRejectedOpen(false);
     setCheckedEmails(new Set());
     setSmartParsedParams(null);
     setSmartSummary(null);
@@ -395,6 +400,7 @@ export default function LeadFinderPage() {
           const sorted = [...leads].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
           setResultLeads(sorted);
           setCheckedEmails(new Set(sorted.map(l => l.email)));
+          setRejectedLeads(status.rejected ?? []);
           setSmartSummary(status.summary ?? null);
           setSmartStage('results');
           return;
@@ -409,6 +415,7 @@ export default function LeadFinderPage() {
             const sorted = [...partialLeads].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
             setResultLeads(sorted);
             setCheckedEmails(new Set(sorted.map(l => l.email)));
+            setRejectedLeads(status.rejected ?? []);
             setSmartSummary(status.summary ?? null);
             setSmartError(status.error || 'Search ended early.');
             setSmartStage('results');
@@ -469,6 +476,8 @@ export default function LeadFinderPage() {
     stopElapsedTimer();
     setSmartStage('idle');
     setResultLeads([]);
+    setRejectedLeads([]);
+    setRejectedOpen(false);
     setCheckedEmails(new Set());
     setCurrentStep(-1);
     setCompletedSteps(new Set());
@@ -1272,7 +1281,8 @@ export default function LeadFinderPage() {
                     </p>
                     <button onClick={handleStartOver} className="mt-5 text-sm text-accent hover:underline font-medium">Try a different search</button>
                   </div>
-                ) : (
+                ) : null}
+                {resultLeads.length > 0 && (
                   <>
                     {/* Strict criteria hint */}
                     {smartSummary && smartParsedParams && smartSummary.matched < smartParsedParams.leadsCount && smartParsedParams.criteria && (
@@ -1354,6 +1364,97 @@ export default function LeadFinderPage() {
                         </button>
                       </div>
                     </div>
+
+                    {/* ── Rejected by AI — collapsible section ── */}
+                    {rejectedLeads.length > 0 && (
+                      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                        {/* Toggle header */}
+                        <button
+                          type="button"
+                          onClick={() => setRejectedOpen(o => !o)}
+                          className="w-full flex items-center justify-between px-5 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                        >
+                          <span className="flex items-center gap-2 text-sm font-medium text-gray-600">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                              <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                            </svg>
+                            Rejected by AI ({rejectedLeads.length})
+                            {smartSummary?.threshold != null && (
+                              <span className="text-xs text-gray-400 font-normal">— scored below {smartSummary.threshold}</span>
+                            )}
+                          </span>
+                          <svg
+                            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                            className={`text-gray-400 transition-transform duration-200 ${rejectedOpen ? 'rotate-180' : ''}`}
+                          >
+                            <polyline points="6 9 12 15 18 9"/>
+                          </svg>
+                        </button>
+
+                        {/* Rows — only rendered when open */}
+                        {rejectedOpen && (
+                          <div className="divide-y divide-gray-100">
+                            {rejectedLeads.map((lead, idx) => {
+                              const checked = checkedEmails.has(lead.email);
+                              return (
+                                <div key={idx} onClick={() => toggleLead(lead.email)}
+                                  className="flex items-start gap-4 px-5 py-4 transition-colors cursor-pointer bg-gray-50/40 hover:bg-gray-50"
+                                >
+                                  <div className="pt-0.5 shrink-0">
+                                    <input type="checkbox" checked={checked}
+                                      onChange={() => toggleLead(lead.email)}
+                                      onClick={e => e.stopPropagation()}
+                                      className="w-4 h-4 rounded border-gray-300 text-accent focus:ring-accent/30 cursor-pointer"
+                                    />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    {/* Title row */}
+                                    <div className="flex items-baseline gap-2 flex-wrap">
+                                      <span className="text-sm font-semibold text-gray-500">{lead.company}</span>
+                                      <ScoreBadge score={lead.score} />
+                                      <a href={lead.website} target="_blank" rel="noopener noreferrer"
+                                        onClick={e => e.stopPropagation()}
+                                        className="text-xs text-accent hover:underline truncate max-w-[160px]"
+                                      >
+                                        {lead.website.replace(/^https?:\/\//, '')}
+                                      </a>
+                                      <span className="text-xs text-gray-400">{lead.email}</span>
+                                    </div>
+                                    {/* AI reason + fetch error tag */}
+                                    {(lead.reason || lead.fetchError) && (
+                                      <div className="mt-1 flex items-center flex-wrap gap-1.5">
+                                        {lead.reason && (
+                                          <p className="text-[11px] text-gray-400 italic">{lead.reason}</p>
+                                        )}
+                                        {lead.fetchError?.code && (
+                                          <span className="text-[10px] font-mono bg-orange-50 text-orange-700 border border-orange-200 px-1.5 py-0.5 rounded shrink-0">
+                                            {lead.fetchError.code}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                    {/* Signal pills */}
+                                    {lead.signals && Object.keys(lead.signals).length > 0 && (
+                                      <div className="mt-1.5 flex flex-wrap gap-1">
+                                        {lead.signals.sslError                && <span className="text-[10px] bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 rounded">SSL cert error</span>}
+                                        {!lead.signals.sslError && lead.signals.hasSSL === false && <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded">no SSL</span>}
+                                        {lead.signals.hasMobileViewport === false && <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">no viewport</span>}
+                                        {lead.signals.doctype && lead.signals.doctype !== 'HTML5' && <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">{lead.signals.doctype}</span>}
+                                        {lead.signals.usesTableLayout         && <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">table layout</span>}
+                                        {lead.signals.hasDeprecatedTags       && <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">deprecated tags</span>}
+                                        {lead.signals.jqueryVersion           && <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">jQuery {lead.signals.jqueryVersion}</span>}
+                                        {lead.signals.hasMediaQueries === false && lead.signals.hasMobileViewport === false && <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">no media queries</span>}
+                                        {lead.signals.copyrightYear           && <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">© {lead.signals.copyrightYear}</span>}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
               </div>

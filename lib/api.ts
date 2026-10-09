@@ -652,12 +652,37 @@ export interface SmartSearchLead {
   reason:  string;
 }
 
+export interface RejectedLead {
+  company: string;
+  city:    string;
+  website: string;
+  email:   string;
+  niche:   string;
+  score:   number;
+  reason:  string;
+  signals: {
+    hasSSL?:            boolean | null;
+    sslError?:          boolean;
+    hasMobileViewport?: boolean | null;
+    copyrightYear?:     number | null;
+    doctype?:           string | null;
+    jqueryVersion?:     string | null;
+    usesTableLayout?:   boolean | null;
+    hasDeprecatedTags?: boolean | null;
+    hasMediaQueries?:   boolean | null;
+  };
+  fetchError?: { code: string; message: string } | null;
+}
+
 export interface SmartSearchSummary {
   candidatesFound:    number;
   homepagesChecked:   number;
   passedPrefilter:    number;
   withEmail:          number;
   matched:            number;
+  rejected?:          number;
+  threshold?:         number;
+  fetchErrorCounts?:  Record<string, number>;
   tomtomCallCount:    number;
   stoppedEarlyReason: string | null;
   totalElapsedSec?:   number;
@@ -683,6 +708,7 @@ export interface SmartJobStatus {
   parsedParams: SmartSearchParsedParams | null;
   progress:     SmartSearchProgress;
   results?:     SmartSearchLead[];   // present while running too (partial)
+  rejected?:    RejectedLead[];      // present only when done
   summary?:     SmartSearchSummary;
   error?:       string;
   saved?:       boolean;
