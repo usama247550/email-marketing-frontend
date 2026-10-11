@@ -452,7 +452,13 @@ export async function deleteEmailApiAccount(id: string): Promise<void> {
   }
 }
 
-// ── Automation API functions ──────────────────────────────────────────────────
+export interface AutomationFinderConfig {
+  country: string;
+  city: string;
+  allCities: boolean;
+  niches: string[];
+  leadsPerDay: number;
+}
 
 export interface ApiAutomation {
   _id: string;
@@ -466,6 +472,11 @@ export interface ApiAutomation {
   lastRunAt: string | null;
   lastRunSentCount: number;
   createdAt: string;
+  leadSource?: 'existing' | 'finder';
+  finder?: AutomationFinderConfig;
+  lastRunFoundCount?: number;
+  lastRunFinderStatus?: 'ok' | 'failed' | 'skipped';
+  lastRunFinderMessage?: string;
 }
 
 export async function getAutomations(): Promise<ApiAutomation[]> {
@@ -488,6 +499,8 @@ export interface CreateAutomationPayload {
   dailyLimit: number;
   scheduledTime: string;
   status?: 'active' | 'paused';
+  leadSource: 'existing' | 'finder';
+  finder?: AutomationFinderConfig;
 }
 
 export async function createAutomation(data: CreateAutomationPayload): Promise<ApiAutomation> {

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, KeyboardEvent } from 'react';
 import Topbar from '@/components/dashboard/Topbar';
+import { FALLBACK_COUNTRIES, type StaticCountry } from '@/lib/countries';
 import {
   getAutomations,
   createAutomation,
@@ -13,9 +14,16 @@ import {
   type Project,
   type Template,
   type CreateAutomationPayload,
+  type AutomationFinderConfig,
 } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+interface Country {
+  name:  { common: string; official: string };
+  flags: { png: string; svg: string; alt?: string };
+  cca2:  string;
+}
 
 interface AutomationFormData {
   name: string;
@@ -23,9 +31,17 @@ interface AutomationFormData {
   templateId: string;
   dailyLimit: number;
   scheduledTime: string;
+  leadSource: 'existing' | 'finder';
+  finderCountry: string;
+  finderCity: string;
+  finderAllCities: boolean;
+  finderNiches: string[];
+  finderLeadsPerDay: number;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+
+const MAX_NICHES = 10;
 
 const EMPTY_FORM: AutomationFormData = {
   name: '',
@@ -33,9 +49,32 @@ const EMPTY_FORM: AutomationFormData = {
   templateId: '',
   dailyLimit: 50,
   scheduledTime: '09:00',
+  leadSource: 'existing',
+  finderCountry: 'Germany',
+  finderCity: 'Frankfurt',
+  finderAllCities: false,
+  finderNiches: [],
+  finderLeadsPerDay: 50,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function FlagImg({ flag, size = 'sm' }: { flag: string; size?: 'sm' | 'xs' }) {
+  const cls = size === 'sm' ? 'w-5 h-4' : 'w-4 h-3';
+  if (flag && flag.startsWith('http')) {
+    return (
+      <img
+        src={flag}
+        alt="flag"
+        className={`${cls} object-cover rounded-sm shrink-0`}
+        onError={e => {
+          (e.target as HTMLImageElement).style.display = 'none';
+        }}
+      />
+    );
+  }
+  return <span className="text-sm shrink-0">{flag || '🏳️'}</span>;
+}
 
 function formatTime(time: string) {
   const [h, m] = time.split(':').map(Number);
@@ -44,15 +83,50 @@ function formatTime(time: string) {
   return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
 }
 
-function formatLastRun(lastRunAt: string | null, lastRunSentCount: number): string {
-  if (!lastRunAt) return 'Never run yet';
-  const date = new Date(lastRunAt);
-  const formatted =
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  return (
     date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
     ', ' +
-    date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  const count = lastRunSentCount > 0 ? ` · sent ${lastRunSentCount} emails` : '';
-  return `Last ran: ${formatted}${count}`;
+    date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  );
+}
+
+function formatLastRunSummary(automation: ApiAutomation): string {
+  const sentCount = automation.lastRunSentCount ?? 0;
+  const sentText = `Sent ${sentCount}`;
+
+  if (automation.lastRunFinderStatus === 'ok') {
+    const foundCount = automation.lastRunFoundCount ?? 0;
+    return `Found ${foundCount} new lead${foundCount !== 1 ? 's' : ''} · ${sentText}`;
+  }
+
+  if (automation.lastRunFinderStatus === 'failed') {
+    const reason = automation.lastRunFinderMessage ? ` (${automation.lastRunFinderMessage})` : '';
+    return `Lead finding failed${reason} · ${sentText}`;
+  }
+
+  if (automation.lastRunFinderStatus === 'skipped') {
+    return `Lead finding skipped · ${sentText}`;
+  }
+
+  if (typeof automation.lastRunFoundCount === 'number') {
+    const foundCount = automation.lastRunFoundCount;
+    return `Found ${foundCount} new lead${foundCount !== 1 ? 's' : ''} · ${sentText}`;
+  }
+
+  return sentCount > 0 ? `Sent ${sentCount} emails` : '0 emails sent';
+}
+
+function formatFinderBadge(finder?: AutomationFinderConfig): string {
+  if (!finder) return 'Auto lead finding';
+  const location = finder.allCities ? 'All cities' : (finder.city || finder.country || 'All cities');
+  const niches = Array.isArray(finder.niches) && finder.niches.length > 0 ? finder.niches.join(', ') : '';
+  const rate = finder.leadsPerDay ? `${finder.leadsPerDay}/day` : '';
+  const parts = [location, niches, rate].filter(Boolean);
+  return parts.length > 0
+    ? `Auto lead finding: ${parts.join(' · ')}`
+    : 'Auto lead finding';
 }
 
 /** Pull a plain string id out of a populated-or-string field.
@@ -114,6 +188,20 @@ export default function AutomationPage() {
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
 
+  // ── Country state ────────────────────────────────────────────────────────────
+  const [countries, setCountries]                     = useState<Country[]>([]);
+  const [countriesLoading, setCountriesLoading]       = useState(false);
+  const [usingFallbackData, setUsingFallbackData]     = useState(false);
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false);
+  const [countrySearchTerm, setCountrySearchTerm]     = useState('Germany');
+  const [selectedCountryFlag, setSelectedCountryFlag] = useState('🇩🇪');
+  const countryInputRef    = useRef<HTMLInputElement>(null);
+  const countryDropdownRef = useRef<HTMLDivElement>(null);
+
+  // ── Niche input state ────────────────────────────────────────────────────────
+  const [nicheInput, setNicheInput] = useState('');
+  const nicheInputRef = useRef<HTMLInputElement>(null);
+
   // ── Form / modal state ───────────────────────────────────────────────────────
   const [showForm, setShowForm]       = useState(false);
   const [editingId, setEditingId]     = useState<string | null>(null);
@@ -136,6 +224,105 @@ export default function AutomationPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  // ─── Country helpers ─────────────────────────────────────────────────────────
+
+  const convertStaticToApiFormat = (s: StaticCountry): Country => ({
+    name:  s.name,
+    flags: { png: s.flags.png, svg: s.flags.svg },
+    cca2:  s.cca2,
+  });
+
+  const applyFallbackCountries = () => {
+    setCountries(FALLBACK_COUNTRIES.map(convertStaticToApiFormat));
+    setUsingFallbackData(true);
+  };
+
+  const fetchCountries = async () => {
+    if (countries.length > 0) return;
+    setCountriesLoading(true);
+    try {
+      const controller = new AbortController();
+      const tid = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch('https://restcountries.com/v3.1/all?fields=name,flags,cca2', { signal: controller.signal });
+      clearTimeout(tid);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: Country[] = await res.json();
+      setCountries(data.sort((a, b) => a.name.common.localeCompare(b.name.common)));
+      setUsingFallbackData(false);
+    } catch {
+      applyFallbackCountries();
+    } finally {
+      setCountriesLoading(false);
+    }
+  };
+
+  const getFlag = (country: Country) =>
+    usingFallbackData
+      ? FALLBACK_COUNTRIES.find(c => c.cca2 === country.cca2)?.flags.emoji ?? '🏳️'
+      : country.flags.png;
+
+  const filteredCountries = countries
+    .filter(c => c.name.common.toLowerCase().includes(countrySearchTerm.toLowerCase()))
+    .slice(0, 10);
+
+  const handleCountrySelect = (country: Country) => {
+    setForm(f => ({ ...f, finderCountry: country.name.common }));
+    setCountrySearchTerm(country.name.common);
+    setSelectedCountryFlag(getFlag(country));
+    setShowCountryDropdown(false);
+  };
+
+  const handleCountryInputChange = (value: string) => {
+    setCountrySearchTerm(value);
+    setForm(f => ({ ...f, finderCountry: value }));
+    setShowCountryDropdown(true);
+    const match = countries.find(c => c.name.common.toLowerCase() === value.toLowerCase());
+    if (match) setSelectedCountryFlag(getFlag(match));
+  };
+
+  // Click outside to close country dropdown
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        countryDropdownRef.current &&
+        !countryDropdownRef.current.contains(e.target as Node) &&
+        !countryInputRef.current?.contains(e.target as Node)
+      ) {
+        setShowCountryDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // ─── Niche tag helpers ───────────────────────────────────────────────────────
+
+  const addNiche = () => {
+    const val = nicheInput.trim();
+    if (!val || form.finderNiches.length >= MAX_NICHES) return;
+    if (form.finderNiches.some(n => n.toLowerCase() === val.toLowerCase())) {
+      setNicheInput('');
+      return;
+    }
+    setForm(f => ({ ...f, finderNiches: [...f.finderNiches, val] }));
+    setNicheInput('');
+    nicheInputRef.current?.focus();
+  };
+
+  const removeNiche = (index: number) => {
+    setForm(f => ({ ...f, finderNiches: f.finderNiches.filter((_, i) => i !== index) }));
+  };
+
+  const handleNicheKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addNiche();
+    }
+    if (e.key === 'Backspace' && nicheInput === '' && form.finderNiches.length > 0) {
+      setForm(f => ({ ...f, finderNiches: f.finderNiches.slice(0, -1) }));
+    }
+  };
+
   // ─── Load data ────────────────────────────────────────────────────────────────
 
   const loadAutomations = useCallback(async () => {
@@ -153,7 +340,7 @@ export default function AutomationPage() {
     const init = async () => {
       setLoading(true);
       try {
-        // Load projects + templates in parallel alongside automations
+        fetchCountries();
         const [, projectsData, templatesData] = await Promise.all([
           loadAutomations(),
           getProjects(),
@@ -168,6 +355,7 @@ export default function AutomationPage() {
       }
     };
     init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadAutomations]);
 
   // ─── Form helpers ──────────────────────────────────────────────────────────
@@ -175,19 +363,41 @@ export default function AutomationPage() {
   const openCreate = () => {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setCountrySearchTerm('Germany');
+    setSelectedCountryFlag('🇩🇪');
+    setNicheInput('');
     setFormErrors({});
     setShowForm(true);
   };
 
   const openEdit = (automation: ApiAutomation) => {
     setEditingId(automation._id);
+    const isFinder = automation.leadSource === 'finder';
+    const country = automation.finder?.country || 'Germany';
+
     setForm({
-      name:          automation.name,
-      projectId:     getId(automation.projectId),
-      templateId:    getId(automation.templateId),
-      dailyLimit:    automation.dailyLimit,
-      scheduledTime: automation.scheduledTime,
+      name:              automation.name,
+      projectId:         getId(automation.projectId),
+      templateId:        getId(automation.templateId),
+      dailyLimit:        automation.dailyLimit,
+      scheduledTime:     automation.scheduledTime,
+      leadSource:        isFinder ? 'finder' : 'existing',
+      finderCountry:     country,
+      finderCity:        automation.finder?.city || (automation.finder?.allCities ? '' : 'Frankfurt'),
+      finderAllCities:   Boolean(automation.finder?.allCities),
+      finderNiches:      Array.isArray(automation.finder?.niches) ? [...automation.finder.niches] : [],
+      finderLeadsPerDay: typeof automation.finder?.leadsPerDay === 'number' ? automation.finder.leadsPerDay : 50,
     });
+
+    setCountrySearchTerm(country);
+    const match = countries.find(c => c.name.common.toLowerCase() === country.toLowerCase());
+    if (match) {
+      setSelectedCountryFlag(getFlag(match));
+    } else {
+      const fallbackMatch = FALLBACK_COUNTRIES.find(c => c.name.common.toLowerCase() === country.toLowerCase());
+      setSelectedCountryFlag(fallbackMatch?.flags.emoji ?? '🇩🇪');
+    }
+    setNicheInput('');
     setFormErrors({});
     setShowForm(true);
   };
@@ -196,8 +406,31 @@ export default function AutomationPage() {
     setShowForm(false);
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setNicheInput('');
+    setShowCountryDropdown(false);
     setFormErrors({});
   };
+
+  // Form validity check for Save button state
+  const isFinderValid =
+    form.leadSource === 'existing' ||
+    (
+      form.finderCountry.trim().length > 0 &&
+      (form.finderAllCities || form.finderCity.trim().length > 0) &&
+      form.finderNiches.length >= 1 &&
+      form.finderNiches.length <= MAX_NICHES &&
+      form.finderLeadsPerDay >= 5 &&
+      form.finderLeadsPerDay <= 100
+    );
+
+  const isBaseFormValid =
+    form.name.trim().length > 0 &&
+    form.projectId.length > 0 &&
+    form.templateId.length > 0 &&
+    form.dailyLimit >= 1 &&
+    form.scheduledTime.length > 0;
+
+  const isFormValid = isBaseFormValid && isFinderValid;
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
@@ -206,6 +439,22 @@ export default function AutomationPage() {
     if (!form.templateId)      errors.templateId    = 'Select a template';
     if (!form.dailyLimit || form.dailyLimit < 1) errors.dailyLimit = 'Must be at least 1';
     if (!form.scheduledTime)   errors.scheduledTime = 'Pick a time';
+
+    if (form.leadSource === 'finder') {
+      if (!form.finderCountry.trim()) {
+        errors.finderCountry = 'Country is required';
+      }
+      if (!form.finderAllCities && !form.finderCity.trim()) {
+        errors.finderCity = 'City is required';
+      }
+      if (form.finderNiches.length === 0) {
+        errors.finderNiches = 'Add at least 1 niche';
+      }
+      if (!form.finderLeadsPerDay || form.finderLeadsPerDay < 5 || form.finderLeadsPerDay > 100) {
+        errors.finderLeadsPerDay = 'Must be between 5 and 100';
+      }
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -220,6 +469,18 @@ export default function AutomationPage() {
         templateId:    form.templateId,
         dailyLimit:    form.dailyLimit,
         scheduledTime: form.scheduledTime,
+        leadSource:    form.leadSource,
+        ...(form.leadSource === 'finder'
+          ? {
+              finder: {
+                country:     form.finderCountry.trim(),
+                city:        form.finderAllCities ? '' : form.finderCity.trim(),
+                allCities:   form.finderAllCities,
+                niches:      form.finderNiches,
+                leadsPerDay: form.finderLeadsPerDay,
+              },
+            }
+          : {}),
       };
 
       if (editingId) {
@@ -384,7 +645,7 @@ export default function AutomationPage() {
                 <tbody className="divide-y divide-gray-100">
                   {automations.map((automation) => (
                     <tr key={automation._id} className="hover:bg-gray-50 transition-colors">
-                      {/* Name / Project / Template */}
+                      {/* Name / Project / Template / Lead Finder Badge */}
                       <td className="px-6 py-4">
                         <div className="text-sm font-semibold text-gray-900 mb-1">
                           {automation.name}
@@ -408,6 +669,15 @@ export default function AutomationPage() {
                               {getName(automation.templateId)}
                             </span>
                           )}
+                          {automation.leadSource === 'finder' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-emerald-600">
+                                <circle cx="11" cy="11" r="8"/>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                              </svg>
+                              {formatFinderBadge(automation.finder)}
+                            </span>
+                          )}
                         </div>
                       </td>
 
@@ -423,9 +693,18 @@ export default function AutomationPage() {
 
                       {/* Last Run */}
                       <td className="px-6 py-4">
-                        <span className="text-sm text-gray-500">
-                          {formatLastRun(automation.lastRunAt, automation.lastRunSentCount)}
-                        </span>
+                        {automation.lastRunAt ? (
+                          <div>
+                            <div className="text-sm text-gray-900 font-medium">
+                              {formatDate(automation.lastRunAt)}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {formatLastRunSummary(automation)}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">Never run yet</span>
+                        )}
                       </td>
 
                       {/* Status toggle */}
@@ -481,9 +760,9 @@ export default function AutomationPage() {
       {/* ── Create / Edit Modal ────────────────────────────────────────────── */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl w-full max-w-lg shadow-xl">
+          <div className="bg-white rounded-xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-xl">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
               <h2 className="text-base font-semibold text-gray-900">
                 {editingId ? 'Edit Automation' : 'Create Automation'}
               </h2>
@@ -500,7 +779,7 @@ export default function AutomationPage() {
             </div>
 
             {/* Body */}
-            <div className="px-6 py-5 space-y-4">
+            <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1">
               {/* API-level error */}
               {formErrors._api && (
                 <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3.5 py-3">
@@ -574,17 +853,297 @@ export default function AutomationPage() {
                 {formErrors.templateId && <p className="mt-1 text-xs text-red-500">{formErrors.templateId}</p>}
               </div>
 
-              {/* Info box */}
-              <div className="flex items-start gap-2.5 bg-blue-50 border border-blue-200 rounded-lg px-3.5 py-3">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500 shrink-0 mt-0.5">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="12" y1="8" x2="12" y2="12"/>
-                  <line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-                <p className="text-xs text-blue-700 leading-relaxed">
-                  This automation will automatically find all new &ldquo;Valid&rdquo; leads in the selected project that haven&rsquo;t received this template yet, every time it runs.
-                </p>
+              {/* ── Lead source ── */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Lead source
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label
+                    className={`relative flex items-start gap-3 p-3.5 rounded-lg border cursor-pointer transition-all ${
+                      form.leadSource === 'existing'
+                        ? 'border-accent bg-accent/5 ring-1 ring-accent'
+                        : 'border-gray-200 bg-white hover:bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="leadSource"
+                      value="existing"
+                      checked={form.leadSource === 'existing'}
+                      onChange={() => setForm(f => ({ ...f, leadSource: 'existing' }))}
+                      className="mt-0.5 h-4 w-4 text-accent border-gray-300 focus:ring-accent cursor-pointer"
+                    />
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">
+                        Use existing leads in this project
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5 leading-snug">
+                        Sends to contacts already saved in this project.
+                      </p>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`relative flex items-start gap-3 p-3.5 rounded-lg border cursor-pointer transition-all ${
+                      form.leadSource === 'finder'
+                        ? 'border-accent bg-accent/5 ring-1 ring-accent'
+                        : 'border-gray-200 bg-white hover:bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="leadSource"
+                      value="finder"
+                      checked={form.leadSource === 'finder'}
+                      onChange={() => {
+                        setForm(f => ({ ...f, leadSource: 'finder' }));
+                        fetchCountries();
+                      }}
+                      className="mt-0.5 h-4 w-4 text-accent border-gray-300 focus:ring-accent cursor-pointer"
+                    />
+                    <div>
+                      <div className="text-sm font-medium text-gray-900 flex items-center gap-1.5">
+                        Find new leads automatically
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5 leading-snug">
+                        Finds and verifies leads right before sending.
+                      </p>
+                    </div>
+                  </label>
+                </div>
               </div>
+
+              {/* ── Conditional: Find new leads automatically fields ── */}
+              {form.leadSource === 'finder' && (
+                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-4">
+                  <div className="flex items-center justify-between pb-1 border-b border-gray-200">
+                    <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      Auto Lead Finding Settings
+                    </span>
+                    <span className="text-[11px] text-accent font-medium bg-accent/10 px-2 py-0.5 rounded">
+                      Runs before email sending
+                    </span>
+                  </div>
+
+                  {/* Country */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Country <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center z-10">
+                        <FlagImg flag={selectedCountryFlag} size="xs" />
+                      </div>
+                      <input
+                        ref={countryInputRef}
+                        type="text"
+                        value={countrySearchTerm}
+                        onChange={e => handleCountryInputChange(e.target.value)}
+                        onFocus={() => { setShowCountryDropdown(true); fetchCountries(); }}
+                        placeholder="Search countries…"
+                        className={`w-full pl-10 pr-10 py-2.5 bg-white border rounded-lg text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent ${
+                          formErrors.finderCountry ? 'border-red-400' : 'border-gray-200'
+                        }`}
+                      />
+                      {countriesLoading && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <svg className="animate-spin h-4 w-4 text-gray-400" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                          </svg>
+                        </div>
+                      )}
+                      {showCountryDropdown && (
+                        <div ref={countryDropdownRef} className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto z-20">
+                          {countriesLoading ? (
+                            <div className="p-3 text-sm text-gray-500">Loading countries…</div>
+                          ) : filteredCountries.length === 0 ? (
+                            <div className="p-3 text-sm text-gray-500">No countries found for &quot;{countrySearchTerm}&quot;</div>
+                          ) : (
+                            <>
+                              {usingFallbackData && (
+                                <div className="p-2 text-xs text-blue-600 bg-blue-50 border-b border-blue-100">
+                                  Using offline country data
+                                </div>
+                              )}
+                              {filteredCountries.map(country => (
+                                <button
+                                  key={country.cca2}
+                                  type="button"
+                                  onClick={() => handleCountrySelect(country)}
+                                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-left hover:bg-gray-50 transition-colors"
+                                >
+                                  <FlagImg flag={getFlag(country)} size="sm" />
+                                  <span className="text-gray-900">{country.name.common}</span>
+                                </button>
+                              ))}
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {formErrors.finderCountry && (
+                      <p className="mt-1 text-xs text-red-500">{formErrors.finderCountry}</p>
+                    )}
+                  </div>
+
+                  {/* City */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-sm font-medium text-gray-700">
+                        City {!form.finderAllCities && <span className="text-red-500">*</span>}
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={form.finderAllCities}
+                          onChange={e => {
+                            const checked = e.target.checked;
+                            setForm(f => ({
+                              ...f,
+                              finderAllCities: checked,
+                              finderCity: checked ? '' : f.finderCity,
+                            }));
+                          }}
+                          className="w-3.5 h-3.5 rounded border-gray-300 text-accent focus:ring-accent/30 cursor-pointer"
+                        />
+                        <span className="text-xs text-gray-500">Search all cities in this country</span>
+                      </label>
+                    </div>
+                    <input
+                      type="text"
+                      value={form.finderCity}
+                      onChange={e => setForm(f => ({ ...f, finderCity: e.target.value }))}
+                      disabled={form.finderAllCities}
+                      placeholder={form.finderAllCities ? 'Searching entire country…' : 'e.g. Frankfurt'}
+                      className={`w-full px-3 py-2.5 bg-white border rounded-lg text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed ${
+                        formErrors.finderCity && !form.finderAllCities ? 'border-red-400' : 'border-gray-200'
+                      }`}
+                    />
+                    {form.finderAllCities && (
+                      <p className="mt-1 text-xs text-amber-600">
+                        ⚠ Whole-country searches may return more varied results and take a bit longer.
+                      </p>
+                    )}
+                    {formErrors.finderCity && !form.finderAllCities && (
+                      <p className="mt-1 text-xs text-red-500">{formErrors.finderCity}</p>
+                    )}
+                  </div>
+
+                  {/* Niches */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-sm font-medium text-gray-700">
+                        Niches <span className="text-red-500">*</span>
+                      </label>
+                      <span className="text-xs text-gray-400">{form.finderNiches.length}/{MAX_NICHES}</span>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <input
+                        ref={nicheInputRef}
+                        type="text"
+                        value={nicheInput}
+                        onChange={e => setNicheInput(e.target.value)}
+                        onKeyDown={handleNicheKeyDown}
+                        disabled={form.finderNiches.length >= MAX_NICHES}
+                        placeholder={form.finderNiches.length >= MAX_NICHES ? `Max ${MAX_NICHES} niches reached` : 'e.g. Jewelry Store, Cafe'}
+                        className="flex-1 px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-gray-100 disabled:text-gray-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={addNiche}
+                        disabled={!nicheInput.trim() || form.finderNiches.length >= MAX_NICHES}
+                        className="px-3.5 py-2.5 bg-accent hover:bg-accent-hover disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors shrink-0"
+                      >
+                        Add
+                      </button>
+                    </div>
+
+                    <p className="mt-1.5 text-xs text-gray-400">
+                      Press{' '}
+                      <kbd className="px-1 py-0.5 bg-white border border-gray-200 rounded text-gray-500 font-mono text-[10px]">Enter</kbd>
+                      {' '}to add,{' '}
+                      <kbd className="px-1 py-0.5 bg-white border border-gray-200 rounded text-gray-500 font-mono text-[10px]">Backspace</kbd>
+                      {' '}on empty to remove last
+                    </p>
+
+                    {form.finderNiches.length > 0 && (
+                      <div className="mt-2.5 flex flex-wrap gap-1.5">
+                        {form.finderNiches.map((niche, i) => (
+                          <span key={i} className="inline-flex items-center gap-1 bg-accent/10 text-accent text-xs font-medium px-2.5 py-1 rounded-md">
+                            {niche}
+                            <button
+                              type="button"
+                              onClick={() => removeNiche(i)}
+                              className="text-accent/50 hover:text-accent ml-0.5 leading-none"
+                              aria-label={`Remove ${niche}`}
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {formErrors.finderNiches && (
+                      <p className="mt-1.5 text-xs text-red-500">{formErrors.finderNiches}</p>
+                    )}
+                  </div>
+
+                  {/* New leads per day */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      New leads per day <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={5}
+                      max={100}
+                      value={form.finderLeadsPerDay}
+                      onChange={e => {
+                        const val = parseInt(e.target.value, 10);
+                        setForm(f => ({ ...f, finderLeadsPerDay: isNaN(val) ? 0 : val }));
+                      }}
+                      className={`w-full px-3 py-2.5 bg-white border rounded-lg text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent ${
+                        formErrors.finderLeadsPerDay ? 'border-red-400' : 'border-gray-200'
+                      }`}
+                    />
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-xs text-gray-400">Min 5, max 100 leads per daily run</span>
+                    </div>
+                    {formErrors.finderLeadsPerDay && (
+                      <p className="mt-1 text-xs text-red-500">{formErrors.finderLeadsPerDay}</p>
+                    )}
+                  </div>
+
+                  {/* Info note */}
+                  <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-lg px-3.5 py-3">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-600 shrink-0 mt-0.5">
+                      <circle cx="12" cy="12" r="10"/>
+                      <line x1="12" y1="8" x2="12" y2="12"/>
+                      <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      Runs first, then sending runs in the same run. If lead finding fails, sending still continues with existing leads. Older unsent leads are sent first.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Info box for existing leads */}
+              {form.leadSource === 'existing' && (
+                <div className="flex items-start gap-2.5 bg-blue-50 border border-blue-200 rounded-lg px-3.5 py-3">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500 shrink-0 mt-0.5">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                  <p className="text-xs text-blue-700 leading-relaxed">
+                    This automation will automatically find all new &ldquo;Valid&rdquo; leads in the selected project that haven&rsquo;t received this template yet, every time it runs.
+                  </p>
+                </div>
+              )}
 
               {/* Daily Limit + Time */}
               <div className="grid grid-cols-2 gap-4">
@@ -620,7 +1179,7 @@ export default function AutomationPage() {
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl shrink-0">
               <button
                 onClick={closeForm}
                 disabled={saving}
@@ -630,8 +1189,8 @@ export default function AutomationPage() {
               </button>
               <button
                 onClick={handleSave}
-                disabled={saving}
-                className="px-5 py-2 text-sm font-semibold text-white bg-accent hover:bg-accent-hover rounded-lg transition-colors disabled:opacity-70 flex items-center gap-2"
+                disabled={saving || !isFormValid}
+                className="px-5 py-2 text-sm font-semibold text-white bg-accent hover:bg-accent-hover rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {saving && (
                   <span className="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
