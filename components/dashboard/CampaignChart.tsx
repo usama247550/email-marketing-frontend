@@ -35,13 +35,13 @@ function formatShortDate(dateStr: string): string {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white border border-gray-100 rounded-xl shadow-lg px-4 py-3 text-sm">
-      <p className="font-semibold text-gray-700 mb-2">{formatShortDate(label)}</p>
+    <div className="bg-[#182234] border border-[#2E3C54] rounded-xl shadow-2xl px-4 py-3 text-sm">
+      <p className="font-semibold text-white mb-2">{formatShortDate(label)}</p>
       {payload.map((entry: any) => (
         <div key={entry.dataKey} className="flex items-center gap-2 mb-0.5">
           <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
-          <span className="text-gray-500 capitalize">{entry.name}:</span>
-          <span className="font-semibold text-gray-800">{entry.value}</span>
+          <span className="text-[#94A3B8] capitalize">{entry.name}:</span>
+          <span className="font-semibold text-white">{entry.value}</span>
         </div>
       ))}
     </div>
@@ -60,14 +60,14 @@ export default function CampaignChart({
   const isEmpty = data.length === 0 || allZeros;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 h-full flex flex-col justify-between">
+    <div className="bg-[#111827] rounded-2xl border border-[#1E293B] shadow-sm p-5 h-full flex flex-col justify-between">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-3">
-          <h2 className="text-base font-semibold text-gray-900">Campaign Performance</h2>
+          <h2 className="text-base font-semibold text-white">Campaign Performance</h2>
           {/* Days selector */}
           {onDaysChange && (
-            <div className="flex items-center bg-gray-100 rounded-lg p-0.5 text-xs font-medium">
+            <div className="flex items-center bg-[#0B0F19] border border-[#1E293B] rounded-lg p-0.5 text-xs font-medium">
               {[7, 14, 30].map((d) => (
                 <button
                   key={d}
@@ -75,8 +75,8 @@ export default function CampaignChart({
                   onClick={() => onDaysChange(d)}
                   className={`px-2.5 py-1 rounded-md transition-colors ${
                     days === d
-                      ? 'bg-white text-gray-900 shadow-sm font-semibold'
-                      : 'text-gray-500 hover:text-gray-900'
+                      ? 'bg-accent text-white shadow-sm font-semibold'
+                      : 'text-[#94A3B8] hover:text-white'
                   }`}
                 >
                   {d}d
@@ -88,7 +88,7 @@ export default function CampaignChart({
 
         {/* Legend */}
         {!isEmpty && !loading && !error && (
-          <div className="flex items-center gap-4 text-xs text-gray-500">
+          <div className="flex items-center gap-4 text-xs text-[#94A3B8]">
             <span className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-[#2563EB]" />
               Sent
@@ -104,61 +104,62 @@ export default function CampaignChart({
       {/* Content */}
       {loading ? (
         <div className="flex flex-col items-center justify-center h-[220px]">
-          <div className="w-full h-full bg-gray-50 rounded-xl animate-pulse flex items-center justify-center text-xs text-gray-400">
+          <div className="w-full h-full bg-[#182234] rounded-xl animate-pulse flex items-center justify-center text-xs text-[#94A3B8]">
             Loading performance data...
           </div>
         </div>
       ) : error ? (
-        <div className="flex flex-col items-center justify-center h-[220px] text-gray-500 gap-2">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="1.5">
+        <div className="flex flex-col items-center justify-center h-[220px] text-[#94A3B8] gap-2">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="1.5">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
-          <p className="text-sm font-medium text-gray-700">Failed to load performance data</p>
-          <p className="text-xs text-gray-400">{error}</p>
+          <p className="text-sm font-medium text-white">Failed to load performance data</p>
+          <p className="text-xs text-[#64748B]">{error}</p>
           {onRetry && (
             <button
               onClick={onRetry}
-              className="mt-1 px-3 py-1.5 text-xs font-semibold text-accent bg-accent/10 hover:bg-accent/20 rounded-lg transition-colors"
+              className="mt-1 px-3 py-1.5 text-xs font-semibold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-lg transition-colors"
             >
               Retry
             </button>
           )}
         </div>
       ) : isEmpty ? (
-        <div className="flex flex-col items-center justify-center h-[220px] text-gray-400">
-          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mb-2.5 text-gray-300">
-            <path d="M3 3v18h18" />
-            <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" />
-          </svg>
-          <p className="text-sm font-medium text-gray-600">No emails sent in the last {days} days</p>
-          <p className="text-xs text-gray-400 mt-1">Start sending campaigns to see your email performance metrics</p>
+        <div className="flex flex-col items-center justify-center h-[220px] text-[#94A3B8]">
+          <div className="w-12 h-12 rounded-full bg-[#182234] border border-[#26354D] flex items-center justify-center mb-3 text-[#94A3B8]">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+            </svg>
+          </div>
+          <p className="text-sm font-semibold text-white">No campaign data yet</p>
+          <p className="text-xs text-[#64748B] mt-1 text-center">Your campaign performance will appear here once you start sending emails.</p>
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={220}>
           <AreaChart data={data} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id="sentGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#2563EB" stopOpacity={0.2} />
+                <stop offset="5%" stopColor="#2563EB" stopOpacity={0.25} />
                 <stop offset="95%" stopColor="#2563EB" stopOpacity={0.0} />
               </linearGradient>
               <linearGradient id="openedGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#7C3AED" stopOpacity={0.2} />
+                <stop offset="5%" stopColor="#7C3AED" stopOpacity={0.25} />
                 <stop offset="95%" stopColor="#7C3AED" stopOpacity={0.0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
             <XAxis
               dataKey="date"
               tickFormatter={formatShortDate}
-              tick={{ fontSize: 11, fill: '#9CA3AF' }}
+              tick={{ fontSize: 11, fill: '#64748B' }}
               axisLine={false}
               tickLine={false}
               dy={8}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: '#9CA3AF' }}
+              tick={{ fontSize: 11, fill: '#64748B' }}
               axisLine={false}
               tickLine={false}
               allowDecimals={false}

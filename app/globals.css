@@ -2,22 +2,136 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg-main: #0B0F19;
+  --bg-card: #111827;
+  --bg-card-hover: #182234;
+  --border-subtle: #1E293B;
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+  color-scheme: dark;
+}
+
 * {
   box-sizing: border-box;
 }
 
+html,
 body {
-  @apply bg-gray-50 text-gray-900;
+  background-color: #0B0F19 !important;
+  color: #F8FAFC !important;
+  font-family: 'Inter', system-ui, sans-serif;
+  min-height: 100vh;
 }
 
-/* Custom scrollbar for sidebar */
+/* Custom dark scrollbar */
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #070B14;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 2px;
+  background: #1E293B;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2E3C54;
+}
+
+/* Universal Dark Card / Panel styling */
+.bg-white {
+  background-color: #111827 !important;
+}
+
+/* Row & list item hovers */
+.hover\:bg-gray-50:hover,
+.hover\:bg-gray-50\/50:hover,
+.hover\:bg-gray-50\/70:hover {
+  background-color: #182234 !important;
+}
+
+.hover\:bg-gray-100:hover {
+  background-color: #1F2C44 !important;
+}
+
+/* Form controls (inputs, selects, textareas) */
+input,
+select,
+textarea {
+  color-scheme: dark;
+}
+
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  background-color: #111827;
+  border-color: #1E293B;
+  color: #F8FAFC;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #64748B !important;
+}
+
+select option {
+  background-color: #111827;
+  color: #F8FAFC;
+}
+
+/* Tables in dark theme */
+table thead tr {
+  background-color: #0F172A !important;
+}
+
+table th {
+  border-bottom: 1px solid #1E293B !important;
+  color: #94A3B8 !important;
+}
+
+table td {
+  border-bottom: 1px solid rgba(30, 41, 59, 0.7) !important;
+}
+
+table tbody tr:hover {
+  background-color: rgba(24, 34, 52, 0.6) !important;
+}
+
+/* Subtle badge / chip adaptations */
+.bg-emerald-50 {
+  background-color: rgba(6, 78, 59, 0.35) !important;
+  color: #34D399 !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+}
+
+.bg-blue-50 {
+  background-color: rgba(30, 58, 138, 0.35) !important;
+  color: #60A5FA !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+.bg-rose-50,
+.bg-red-50,
+.bg-red-100 {
+  background-color: rgba(136, 19, 55, 0.35) !important;
+  color: #F87171 !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+}
+
+.bg-amber-50,
+.bg-amber-100 {
+  background-color: rgba(120, 53, 15, 0.35) !important;
+  color: #FBBF24 !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+/* Modal backdrops */
+.bg-black\/40,
+.bg-black\/50,
+.bg-opacity-50 {
+  background-color: rgba(3, 7, 18, 0.8) !important;
+  backdrop-filter: blur(4px);
 }
