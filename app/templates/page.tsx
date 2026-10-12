@@ -88,7 +88,7 @@ function ToolbarBtn({
         e.preventDefault(); // prevent editor losing focus
         onClick();
       }}
-      className="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors text-xs font-medium"
+      className="w-7 h-7 min-h-[28px] flex items-center justify-center rounded text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors text-xs font-medium shrink-0"
     >
       {children}
     </button>
@@ -122,7 +122,7 @@ function RichEditor({ value, onChange, editorRef }: RichEditorProps) {
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-accent/30 focus-within:border-accent transition-all">
       {/* Toolbar */}
-      <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-gray-200 bg-gray-50">
+      <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-gray-200 bg-gray-50">
         <ToolbarBtn title="Bold" onClick={() => exec('bold')}>
           <strong>B</strong>
         </ToolbarBtn>
@@ -198,7 +198,7 @@ function DeleteConfirmModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 w-full max-w-sm mx-4">
+      <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-4 md:p-6 w-full max-w-sm mx-4 max-h-[90dvh] overflow-y-auto">
         <div className="flex items-center gap-3 mb-3">
           <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 shrink-0">
             <IconTrash />
@@ -208,16 +208,16 @@ function DeleteConfirmModal({
         <p className="text-sm text-gray-500 mb-5">
           <span className="font-medium text-gray-700">&quot;{templateName}&quot;</span> will be permanently deleted. This action cannot be undone.
         </p>
-        <div className="flex items-center gap-2 justify-end">
+        <div className="flex flex-wrap items-center gap-2 justify-end">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex-1 sm:flex-none px-4 py-2 min-h-[44px] text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
+            className="flex-1 sm:flex-none px-4 py-2 min-h-[44px] text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
           >
             Delete
           </button>
@@ -240,16 +240,16 @@ function PreviewModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-2xl mx-4 flex flex-col max-h-[85vh]">
+      <div className="bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-2xl mx-4 flex flex-col max-h-[90dvh]">
         {/* Modal header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-gray-100">
           <div className="flex items-center gap-2 text-gray-700">
             <IconEye />
             <span className="text-sm font-semibold">Email Preview</span>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 hover:text-gray-600 transition-colors p-1 min-h-[40px] min-w-[40px] flex items-center justify-center"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -258,7 +258,7 @@ function PreviewModal({
         </div>
 
         {/* Email chrome */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6">
           <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
             {/* Email header bar */}
             <div className="bg-gray-50 border-b border-gray-200 px-5 py-3 space-y-1.5">
@@ -279,10 +279,10 @@ function PreviewModal({
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
+        <div className="px-4 md:px-6 py-3 md:py-4 border-t border-gray-100 flex justify-end sticky bottom-0 bg-white">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 min-h-[44px] text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
           >
             Close Preview
           </button>
@@ -519,16 +519,16 @@ export default function TemplatesPage() {
 
       {/* ── VIEW 1: Templates List ── */}
       {view === 'list' && (
-        <div className="flex-1 px-7 py-6 max-w-[1400px] w-full mx-auto space-y-6">
+        <div className="flex-1 px-4 py-4 md:px-6 lg:px-7 md:py-6 max-w-[1400px] w-full mx-auto space-y-5 md:space-y-6 min-w-0">
           {/* Heading row */}
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Email Templates</h1>
               <p className="text-sm text-gray-400 mt-0.5">Create and manage your email templates.</p>
             </div>
             <button
               onClick={() => openComposer(null)}
-              className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors shrink-0"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium px-4 py-2.5 min-h-[44px] rounded-lg transition-colors shrink-0"
             >
               <IconPlus />
               Create New Template
@@ -562,7 +562,8 @@ export default function TemplatesPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full">
+                {/* Desktop table view */}
+                <table className="w-full hidden md:table">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -586,7 +587,7 @@ export default function TemplatesPage() {
                           <span className="text-sm font-medium text-gray-900">{tpl.name}</span>
                         </td>
                         <td className="px-6 py-4 max-w-xs">
-                          <span className="text-sm text-gray-500 truncate block">{tpl.subject}</span>
+                          <span className="text-sm text-gray-500 truncate block" title={tpl.subject}>{tpl.subject}</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {formatDate(tpl.updatedAt)}
@@ -596,7 +597,7 @@ export default function TemplatesPage() {
                             <button
                               onClick={() => openComposer(tpl)}
                               title="Edit template"
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-accent transition-colors"
+                              className="flex items-center gap-1.5 px-3 py-1.5 min-h-[40px] text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-accent transition-colors"
                             >
                               <IconEdit />
                               Edit
@@ -604,7 +605,7 @@ export default function TemplatesPage() {
                             <button
                               onClick={() => handleDelete(tpl)}
                               title="Delete template"
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-400 bg-white border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
+                              className="flex items-center gap-1.5 px-3 py-1.5 min-h-[40px] text-xs font-medium text-gray-400 bg-white border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
                             >
                               <IconTrash />
                               Delete
@@ -615,6 +616,37 @@ export default function TemplatesPage() {
                     ))}
                   </tbody>
                 </table>
+
+                {/* Mobile card view */}
+                <div className="md:hidden divide-y divide-gray-100">
+                  {templates.map((tpl) => (
+                    <div key={tpl._id} className="p-4 space-y-2">
+                      <div className="flex items-start justify-between gap-2 min-w-0">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate" title={tpl.name}>{tpl.name}</p>
+                          <p className="text-xs text-gray-500 truncate mt-0.5" title={tpl.subject}>{tpl.subject}</p>
+                        </div>
+                        <span className="text-xs text-gray-400 shrink-0">{formatDate(tpl.updatedAt)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => openComposer(tpl)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 min-h-[40px] text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-accent transition-colors"
+                        >
+                          <IconEdit />
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(tpl)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 min-h-[40px] text-xs font-medium text-gray-400 bg-white border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
+                        >
+                          <IconTrash />
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -623,12 +655,12 @@ export default function TemplatesPage() {
 
       {/* ── VIEW 2: Template Composer ── */}
       {view === 'composer' && (
-        <div className="flex-1 px-7 py-6 max-w-[1400px] w-full mx-auto space-y-5">
+        <div className="flex-1 px-4 py-4 md:px-6 lg:px-7 md:py-6 max-w-[1400px] w-full mx-auto space-y-4 md:space-y-5 min-w-0">
           {/* Back + heading */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={() => setView('list')}
-              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors"
+              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors min-h-[40px]"
             >
               <IconBack />
               Back
@@ -647,7 +679,7 @@ export default function TemplatesPage() {
           {/* Two-column layout */}
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-5 items-start">
             {/* ── Left: Template Details card ── */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6 space-y-5">
               <h2 className="text-sm font-semibold text-gray-900">Template Details</h2>
 
               {/* Template Name */}
@@ -691,11 +723,11 @@ export default function TemplatesPage() {
               </div>
 
               {/* Action buttons */}
-              <div className="flex items-center gap-3 pt-1">
+              <div className="flex flex-wrap items-center gap-3 pt-1">
                 <button
                   onClick={handleSave}
                   disabled={!formName.trim() || saving}
-                  className="flex items-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-5 py-2.5 min-h-[44px] rounded-lg transition-colors"
                 >
                   {saving && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -707,7 +739,7 @@ export default function TemplatesPage() {
                 </button>
                 <button
                   onClick={() => setShowPreview(true)}
-                  className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium px-5 py-2.5 rounded-lg border border-gray-200 transition-colors"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium px-5 py-2.5 min-h-[44px] rounded-lg border border-gray-200 transition-colors"
                 >
                   <IconEye />
                   Preview
@@ -716,20 +748,20 @@ export default function TemplatesPage() {
             </div>
 
             {/* ── Right: Variables card ── */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-5 space-y-4">
               <h2 className="text-sm font-semibold text-gray-900">Variables</h2>
               <p className="text-xs text-gray-400 -mt-2">
                 Click a variable to insert it at your cursor position.
               </p>
 
               {/* Variable pills */}
-              <div className="space-y-1.5">
+              <div className="flex flex-wrap gap-1.5">
                 {variables.map((v) => (
                   <button
                     key={v.id}
                     type="button"
                     onClick={() => insertVariable(v.tag)}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 hover:border-accent hover:bg-accent/5 transition-all group"
+                    className="flex items-center justify-between px-3 py-2 min-h-[40px] rounded-lg border border-gray-200 hover:border-accent hover:bg-accent/5 transition-all group"
                   >
                     <span className="text-xs font-mono font-medium text-accent group-hover:text-accent">
                       {v.tag}

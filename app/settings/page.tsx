@@ -329,8 +329,8 @@ export default function SettingsPage() {
     <div className="flex flex-col flex-1 min-h-screen bg-gray-50">
       <Topbar selectedProject={selectedProject as any} onProjectChange={(id) => handleProjectChange(id as string)} />
       
-      <div className="flex-1 px-7 py-6">
-        <div className="max-w-4xl">
+      <div className="flex-1 px-4 py-4 md:px-6 lg:px-7 md:py-6 min-w-0">
+        <div className="max-w-4xl min-w-0">
           <div className="mb-6">
             <h1 className="text-xl font-semibold text-gray-900 mb-1">Settings</h1>
             <p className="text-sm text-gray-500">Configure your email and sending preferences.</p>
@@ -348,15 +348,15 @@ export default function SettingsPage() {
           )}
 
           {/* Single Unified Form */}
-          <div className="bg-white rounded-xl border border-gray-100 p-6 mb-8">
-            <div className="flex items-center justify-between mb-6">
+          <div className="bg-white rounded-xl border border-gray-100 p-4 md:p-6 mb-6 md:mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
               <h2 className="text-lg font-semibold text-gray-900">
                 {formMode === 'edit' ? 'Edit Project' : 'Create New Project'}
               </h2>
               {formMode === 'edit' && (
                 <button
                   onClick={handleAddNewProject}
-                  className="bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                  className="w-full sm:w-auto bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-4 py-2 min-h-[40px] rounded-lg transition-colors flex items-center justify-center gap-2"
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="12" y1="5" x2="12" y2="19"/>
@@ -543,12 +543,12 @@ export default function SettingsPage() {
             )}
 
             {/* Form Actions */}
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               {formMode === 'edit' ? (
                 <button
                   onClick={handleSaveChanges}
                   disabled={saving || !formData.name || !formData.senderEmail}
-                  className="bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="w-full sm:w-auto bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-6 py-3 min-h-[44px] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {saving && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
                   {saving ? 'Saving...' : 'Save Changes'}
@@ -558,7 +558,7 @@ export default function SettingsPage() {
                   <button
                     onClick={handleCreateProject}
                     disabled={saving || !formData.name || !formData.senderEmail}
-                    className="bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="w-full sm:w-auto bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-4 py-2 min-h-[40px] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {saving && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
                     {saving ? 'Creating...' : 'Create Project'}
@@ -566,7 +566,7 @@ export default function SettingsPage() {
                   <button
                     onClick={handleCancel}
                     disabled={saving}
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full sm:w-auto bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold px-4 py-2 min-h-[40px] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Cancel
                   </button>
@@ -575,31 +575,31 @@ export default function SettingsPage() {
             </div>
           </div>
           {/* All Projects List */}
-          <div className="bg-white rounded-xl border border-gray-100 p-6">
+          <div className="bg-white rounded-xl border border-gray-100 p-4 md:p-6 mb-6 md:mb-8">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">All Projects</h3>
             {projects.length === 0 ? (
               <p className="text-gray-500 text-center py-8">No projects found. Create your first project above.</p>
             ) : (
               <div className="space-y-3">
                 {projects.map((project) => (
-                  <div key={project._id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                    <div>
-                      <h4 className="font-medium text-gray-900">{project.name}</h4>
-                      <div className="text-sm text-gray-500 mt-1">
-                        <span>Email: {project.senderEmail}</span>
-                        {project.niche && <span className="ml-4">Niche: {project.niche}</span>}
+                  <div key={project._id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 border border-gray-200 rounded-lg">
+                    <div className="min-w-0">
+                      <h4 className="font-medium text-gray-900 truncate" title={project.name}>{project.name}</h4>
+                      <div className="text-sm text-gray-500 mt-1 break-words">
+                        <span className="break-all" title={project.senderEmail}>Email: {project.senderEmail}</span>
+                        {project.niche && <span className="ml-0 sm:ml-4 block sm:inline">Niche: {project.niche}</span>}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       <button 
                         onClick={() => handleEditProject(project)}
-                        className="text-gray-400 hover:text-accent text-sm font-medium px-3 py-1 rounded-lg hover:bg-accent-light transition-colors"
+                        className="text-gray-400 hover:text-accent text-sm font-medium px-3 py-1 min-h-[40px] rounded-lg hover:bg-accent-light transition-colors"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => setShowDeleteConfirm(project._id)}
-                        className="text-gray-400 hover:text-red-600 text-sm font-medium px-3 py-1 rounded-lg hover:bg-red-50 transition-colors"
+                        className="text-gray-400 hover:text-red-600 text-sm font-medium px-3 py-1 min-h-[40px] rounded-lg hover:bg-red-50 transition-colors"
                       >
                         Delete
                       </button>
@@ -611,12 +611,12 @@ export default function SettingsPage() {
           </div>
 
           {/* Email API Accounts Management */}
-          <div className="bg-white rounded-xl border border-gray-100 p-6 mb-8">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-xl border border-gray-100 p-4 md:p-6 mb-6 md:mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Email API Accounts</h3>
               <button
                 onClick={() => setShowApiAccountModal(true)}
-                className="bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                className="w-full sm:w-auto bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-4 py-2 min-h-[40px] rounded-lg transition-colors flex items-center justify-center gap-2"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="5" x2="12" y2="19"/>
@@ -636,24 +636,24 @@ export default function SettingsPage() {
             ) : (
               <div className="space-y-3">
                 {emailApiAccounts.map((account) => (
-                  <div key={account._id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                    <div>
-                      <h4 className="font-medium text-gray-900">{account.name}</h4>
-                      <div className="text-sm text-gray-500 mt-1">
+                  <div key={account._id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 border border-gray-200 rounded-lg">
+                    <div className="min-w-0">
+                      <h4 className="font-medium text-gray-900 truncate" title={account.name}>{account.name}</h4>
+                      <div className="text-sm text-gray-500 mt-1 break-words">
                         <span>Provider: {account.provider}</span>
-                        <span className="ml-4">API Key: {maskApiKey(account.apiKey)}</span>
+                        <span className="ml-0 sm:ml-4 block sm:inline break-all">API Key: {maskApiKey(account.apiKey)}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       <button 
                         onClick={() => handleEditApiAccount(account)}
-                        className="text-gray-400 hover:text-accent text-sm font-medium px-3 py-1 rounded-lg hover:bg-accent-light transition-colors"
+                        className="text-gray-400 hover:text-accent text-sm font-medium px-3 py-1 min-h-[40px] rounded-lg hover:bg-accent-light transition-colors"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => setShowApiAccountDeleteConfirm(account._id)}
-                        className="text-gray-400 hover:text-red-600 text-sm font-medium px-3 py-1 rounded-lg hover:bg-red-50 transition-colors"
+                        className="text-gray-400 hover:text-red-600 text-sm font-medium px-3 py-1 min-h-[40px] rounded-lg hover:bg-red-50 transition-colors"
                       >
                         Delete
                       </button>
@@ -667,21 +667,21 @@ export default function SettingsPage() {
           {/* Delete Confirmation Modal */}
           {showDeleteConfirm && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-xl p-6 max-w-md w-full">
+              <div className="bg-white rounded-xl p-4 md:p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Project</h3>
                 <p className="text-gray-600 text-sm mb-6">
                   Are you sure you want to delete this project? This action cannot be undone.
                 </p>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
                   <button
                     onClick={() => handleDeleteProject(showDeleteConfirm)}
-                    className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+                    className="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 min-h-[44px] rounded-lg transition-colors"
                   >
                     Delete
                   </button>
                   <button
                     onClick={() => setShowDeleteConfirm(null)}
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+                    className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold px-4 py-2 min-h-[44px] rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
@@ -693,7 +693,7 @@ export default function SettingsPage() {
           {/* Email API Account Modal */}
           {showApiAccountModal && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-xl p-6 max-w-md w-full">
+              <div className="bg-white rounded-xl p-4 md:p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto flex flex-col">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
                   {apiAccountFormMode === 'create' ? 'Create Email API Account' : 'Edit Email API Account'}
                 </h3>
@@ -736,11 +736,11 @@ export default function SettingsPage() {
                     />
                   </div>
                 </div>
-                <div className="flex gap-3 mt-6">
+                <div className="flex flex-wrap gap-3 mt-6 sticky bottom-0 bg-white pt-2">
                   <button
                     onClick={apiAccountFormMode === 'create' ? handleCreateApiAccount : handleUpdateApiAccount}
                     disabled={apiAccountSaving || !apiAccountForm.name || !apiAccountForm.apiKey}
-                    className="bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="flex-1 sm:flex-none bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-4 py-2 min-h-[44px] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {apiAccountSaving && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
                     {apiAccountSaving ? 'Saving...' : (apiAccountFormMode === 'create' ? 'Create Account' : 'Update Account')}
@@ -748,7 +748,7 @@ export default function SettingsPage() {
                   <button
                     onClick={resetApiAccountModal}
                     disabled={apiAccountSaving}
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold px-4 py-2 min-h-[44px] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Cancel
                   </button>
@@ -760,21 +760,21 @@ export default function SettingsPage() {
           {/* Email API Account Delete Confirmation Modal */}
           {showApiAccountDeleteConfirm && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-xl p-6 max-w-md w-full">
+              <div className="bg-white rounded-xl p-4 md:p-6 max-w-md w-full max-h-[90dvh] overflow-y-auto">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Email API Account</h3>
                 <p className="text-gray-600 text-sm mb-6">
                   Are you sure you want to delete this email API account? This action cannot be undone and may affect projects using this account.
                 </p>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
                   <button
                     onClick={() => handleDeleteApiAccount(showApiAccountDeleteConfirm)}
-                    className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+                    className="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 min-h-[44px] rounded-lg transition-colors"
                   >
                     Delete
                   </button>
                   <button
                     onClick={() => setShowApiAccountDeleteConfirm(null)}
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+                    className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold px-4 py-2 min-h-[44px] rounded-lg transition-colors"
                   >
                     Cancel
                   </button>

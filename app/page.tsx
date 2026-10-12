@@ -161,11 +161,11 @@ export default function DashboardPage() {
       />
 
       {/* Page content */}
-      <div className="flex-1 px-7 py-6 space-y-6 max-w-[1400px] w-full mx-auto">
+      <div className="flex-1 px-4 py-4 md:px-6 lg:px-7 md:py-6 space-y-5 md:space-y-6 max-w-[1400px] w-full mx-auto min-w-0">
         {/* Welcome heading */}
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2 tracking-tight">
+        <div className="flex items-start justify-between gap-3 min-w-0">
+          <div className="min-w-0">
+            <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2 tracking-tight">
               Dashboard
             </h1>
             <p className="text-sm text-[#94A3B8] mt-0.5">
@@ -190,17 +190,17 @@ export default function DashboardPage() {
 
         {/* Global error banner if stats failed */}
         {statsError && (
-          <div className="flex items-center gap-3 bg-amber-950/40 border border-amber-800/60 text-amber-300 text-sm rounded-xl px-4 py-3">
+          <div className="flex flex-wrap items-center gap-3 bg-amber-950/40 border border-amber-800/60 text-amber-300 text-sm rounded-xl px-4 py-3">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
               <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
-            <span>Backend unreachable — showing cached data. <span className="font-medium">{statsError}</span></span>
-            <button onClick={handleRetryAll} className="ml-auto text-xs font-semibold underline hover:no-underline">Retry all</button>
+            <span className="min-w-0 break-words">Backend unreachable — showing cached data. <span className="font-medium">{statsError}</span></span>
+            <button onClick={handleRetryAll} className="ml-auto text-xs font-semibold underline hover:no-underline min-h-[40px] flex items-center">Retry all</button>
           </div>
         )}
 
         {/* Stats cards row */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
           {statCards.map((card) => (
             <StatsCard
               key={card.title}
@@ -213,7 +213,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Chart + Recent Campaigns */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 md:gap-4 items-stretch">
           <div className="lg:col-span-3">
             <CampaignChart
               data={performanceData}

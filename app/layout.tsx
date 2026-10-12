@@ -20,7 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="flex min-h-screen bg-[#0B0F19] text-[#F8FAFC] font-sans antialiased">
         <Sidebar />
-        <main className="flex-1 flex flex-col min-h-screen overflow-auto bg-[#0B0F19]">
+        <main className="flex-1 flex flex-col min-h-screen overflow-auto bg-[#0B0F19] min-w-0">
           {children}
         </main>
       </body>

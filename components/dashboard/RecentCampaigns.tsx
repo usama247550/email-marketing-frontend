@@ -56,7 +56,7 @@ export default function RecentCampaigns({
   const isEmpty = campaigns.length === 0;
 
   return (
-    <div className="bg-[#111827] rounded-2xl border border-[#1E293B] shadow-sm p-5 flex flex-col justify-between h-full">
+    <div className="bg-[#111827] rounded-2xl border border-[#1E293B] shadow-sm p-4 md:p-5 flex flex-col justify-between h-full min-w-0">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-base font-semibold text-white">Recent Campaigns</h2>
         <Link
@@ -121,7 +121,7 @@ export default function RecentCampaigns({
               <Link
                 key={c._id}
                 href={`/campaigns/${c._id}`}
-                className="flex items-center gap-3 py-3 hover:bg-[#182234]/70 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
+                className="flex flex-wrap sm:flex-nowrap items-start sm:items-center gap-3 py-3 hover:bg-[#182234]/70 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer min-h-[44px]"
               >
                 {/* Campaign icon */}
                 <div className={`w-9 h-9 rounded-xl ${iconColor} flex items-center justify-center shrink-0 shadow-sm`}>
@@ -134,23 +134,23 @@ export default function RecentCampaigns({
                 {/* Name + meta */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-white truncate group-hover:text-blue-400 transition-colors">
+                    <p className="text-sm font-semibold text-white truncate group-hover:text-blue-400 transition-colors" title={c.name}>
                       {c.name}
                     </p>
                     {c.projectName && (
-                      <span className="text-[11px] font-medium text-[#94A3B8] bg-[#182234] border border-[#2E3C54]/60 px-1.5 py-0.5 rounded shrink-0 truncate max-w-[120px]">
+                      <span className="hidden sm:inline-block text-[11px] font-medium text-[#94A3B8] bg-[#182234] border border-[#2E3C54]/60 px-1.5 py-0.5 rounded shrink-0 truncate max-w-[120px]" title={c.projectName}>
                         {c.projectName}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-[#94A3B8] mt-0.5">
+                  <p className="text-xs text-[#94A3B8] mt-0.5 break-words">
                     {c.sentCount} sent / {c.openedCount} opened ({c.openRate}%) &bull; {dateText}
                   </p>
                 </div>
 
                 {/* Status badge */}
                 <span
-                  className={`shrink-0 text-[11px] font-medium px-2.5 py-1 rounded-full capitalize ${
+                  className={`shrink-0 text-[11px] font-medium px-2.5 py-1 rounded-full capitalize ml-auto min-h-[28px] flex items-center ${
                     STATUS_STYLES[c.status] ?? STATUS_STYLES.draft
                   }`}
                 >

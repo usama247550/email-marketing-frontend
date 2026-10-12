@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -87,6 +87,19 @@ const Icons = {
       <path d="M12 15l3-3-3-3" />
     </svg>
   ),
+  hamburger: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  ),
+  close: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  ),
 };
 
 const NAV_ITEMS: NavItem[] = [
@@ -103,6 +116,7 @@ const NAV_ITEMS: NavItem[] = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('sidebar_collapsed');
@@ -110,6 +124,33 @@ export default function Sidebar() {
       setCollapsed(saved === 'true');
     }
   }, []);
+
+  // Close mobile drawer on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  // Lock body scroll when mobile drawer is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileOpen]);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileOpen(false);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [mobileOpen]);
 
   const toggleSidebar = () => {
     setCollapsed((prev) => {
@@ -123,24 +164,22 @@ export default function Sidebar() {
     });
   };
 
+  const openMobileDrawer = useCallback(() => setMobileOpen(true), []);
+  const closeMobileDrawer = useCallback(() => setMobileOpen(false), []);
+
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
     return pathname.startsWith(href);
   };
 
-  return (
-    <aside
-      className={`
-        flex flex-col min-h-screen bg-[#070B14] border-r border-[#1E293B]/60 shrink-0
-        transition-[width] duration-300 ease-in-out
-        ${collapsed ? 'w-[68px]' : 'w-[220px]'}
-      `}
-    >
+  // Shared sidebar content used for both desktop aside and mobile drawer
+  const sidebarContent = (
+    <>
       {/* Logo & Top Toggle */}
       <div
         className={`
           flex items-center border-b border-[#1E293B]/40 min-h-[65px] px-3.5 py-4 transition-all
-          ${collapsed ? 'justify-center' : 'justify-between'}
+          ${collapsed ? 'lg:justify-center justify-between' : 'justify-between'}
         `}
       >
         <div className="flex items-center gap-2.5 overflow-hidden">
@@ -154,18 +193,27 @@ export default function Sidebar() {
           >
             {Icons.email}
           </div>
-          {!collapsed && (
-            <div className="leading-tight overflow-hidden whitespace-nowrap">
-              <p className="text-white font-bold text-sm tracking-tight">ArSwift</p>
-              <p className="text-[#94A3B8] text-[10px] font-medium">Email Marketing</p>
-            </div>
-          )}
+          {/* On mobile drawer, always show text. On desktop, respect collapsed state */}
+          <div className={`leading-tight overflow-hidden whitespace-nowrap ${collapsed ? 'lg:hidden' : ''}`}>
+            <p className="text-white font-bold text-sm tracking-tight">ArSwift</p>
+            <p className="text-[#94A3B8] text-[10px] font-medium">Email Marketing</p>
+          </div>
         </div>
 
+        {/* Close button for mobile drawer */}
+        <button
+          onClick={closeMobileDrawer}
+          className="lg:hidden p-2 rounded-lg text-[#94A3B8] hover:text-white hover:bg-white/5 active:scale-95 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+          aria-label="Close menu"
+        >
+          {Icons.close}
+        </button>
+
+        {/* Desktop collapse button */}
         {!collapsed && (
           <button
             onClick={toggleSidebar}
-            className="p-1.5 rounded-lg text-[#94A3B8] hover:text-white hover:bg-white/5 active:scale-95 transition-all"
+            className="hidden lg:flex p-1.5 rounded-lg text-[#94A3B8] hover:text-white hover:bg-white/5 active:scale-95 transition-all"
             title="Collapse sidebar"
             aria-label="Collapse sidebar"
           >
@@ -184,8 +232,8 @@ export default function Sidebar() {
               href={item.href}
               title={collapsed ? item.label : undefined}
               className={`
-                flex items-center gap-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group
-                ${collapsed ? 'justify-center px-0' : 'px-3'}
+                flex items-center gap-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group min-h-[44px]
+                ${collapsed ? 'lg:justify-center lg:px-0 px-3' : 'px-3'}
                 ${active
                   ? 'bg-accent text-white shadow-sm shadow-accent/30 font-semibold'
                   : 'text-[#94A3B8] hover:text-white hover:bg-white/5'
@@ -195,16 +243,17 @@ export default function Sidebar() {
               <span className={`shrink-0 transition-colors ${active ? 'text-white' : 'text-[#94A3B8]/80 group-hover:text-white'}`}>
                 {item.icon}
               </span>
-              {!collapsed && (
-                <span className="truncate whitespace-nowrap">{item.label}</span>
-              )}
+              {/* On mobile drawer: always show label. On desktop: respect collapsed state */}
+              <span className={`truncate whitespace-nowrap ${collapsed ? 'lg:hidden' : ''}`}>
+                {item.label}
+              </span>
             </Link>
           );
         })}
       </nav>
 
-      {/* Bottom Toggle Button */}
-      <div className="p-2 border-t border-[#1E293B]/40">
+      {/* Bottom Toggle Button (desktop only) */}
+      <div className="hidden lg:block p-2 border-t border-[#1E293B]/40">
         <button
           onClick={toggleSidebar}
           className={`
@@ -220,6 +269,62 @@ export default function Sidebar() {
           {!collapsed && <span className="truncate">Collapse sidebar</span>}
         </button>
       </div>
-    </aside>
+    </>
   );
+
+  return (
+    <>
+      {/* ── Desktop sidebar: visible from lg upward ── */}
+      <aside
+        className={`
+          hidden lg:flex flex-col min-h-screen bg-[#070B14] border-r border-[#1E293B]/60 shrink-0
+          transition-[width] duration-300 ease-in-out
+          ${collapsed ? 'w-[68px]' : 'w-[220px]'}
+        `}
+      >
+        {sidebarContent}
+      </aside>
+
+      {/* ── Mobile hamburger button: exported via CSS custom property for topbar to use ── */}
+      {/* This button is rendered in the Topbar component instead, see Topbar.tsx */}
+
+      {/* ── Mobile drawer overlay ── */}
+      {mobileOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+          onClick={closeMobileDrawer}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* ── Mobile drawer ── */}
+      <aside
+        className={`
+          lg:hidden fixed inset-y-0 left-0 z-50 w-[260px] max-w-[80vw] bg-[#070B14] border-r border-[#1E293B]/60
+          flex flex-col transition-transform duration-300 ease-in-out
+          ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}
+      >
+        {sidebarContent}
+      </aside>
+
+      {/* ── Expose the hamburger opener for the topbar to call ── */}
+      {/* We attach the open function to a global so the Topbar can call it without prop drilling through layout */}
+      <HamburgerBridge onOpen={openMobileDrawer} />
+    </>
+  );
+}
+
+/**
+ * Invisible component that exposes the mobile sidebar open function
+ * on `window.__openMobileSidebar` so the Topbar can call it without prop drilling.
+ */
+function HamburgerBridge({ onOpen }: { onOpen: () => void }) {
+  useEffect(() => {
+    (window as any).__openMobileSidebar = onOpen;
+    return () => {
+      delete (window as any).__openMobileSidebar;
+    };
+  }, [onOpen]);
+  return null;
 }

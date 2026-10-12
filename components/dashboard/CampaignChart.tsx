@@ -9,6 +9,7 @@ import {
   YAxis,
   Tooltip,
 } from 'recharts';
+import { useState, useEffect } from 'react';
 import type { PerformanceDay } from '@/lib/api';
 
 interface CampaignChartProps {
@@ -30,6 +31,16 @@ function formatShortDate(dateStr: string): string {
     return `${months[m] || parts[1]} ${d}`;
   }
   return dateStr;
+}
+
+function useWindowWidth() {
+  const [width, setWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  useEffect(() => {
+    const handle = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', handle);
+    return () => window.removeEventListener('resize', handle);
+  }, []);
+  return width;
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -58,12 +69,16 @@ export default function CampaignChart({
 }: CampaignChartProps) {
   const allZeros = data.length > 0 && data.every((d) => d.sent === 0);
   const isEmpty = data.length === 0 || allZeros;
+  const windowWidth = useWindowWidth();
+  const chartHeight = windowWidth < 640 ? 160 : 220;
+  // On phones show fewer x-axis ticks to avoid overlap
+  const tickInterval = windowWidth < 640 ? Math.max(Math.ceil(data.length / 4) - 1, 1) : windowWidth < 768 ? Math.max(Math.ceil(data.length / 6) - 1, 0) : 0;
 
   return (
-    <div className="bg-[#111827] rounded-2xl border border-[#1E293B] shadow-sm p-5 h-full flex flex-col justify-between">
+    <div className="bg-[#111827] rounded-2xl border border-[#1E293B] shadow-sm p-4 md:p-5 h-full flex flex-col justify-between min-w-0">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 md:gap-3 mb-4 md:mb-5">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
           <h2 className="text-base font-semibold text-white">Campaign Performance</h2>
           {/* Days selector */}
           {onDaysChange && (
@@ -88,7 +103,7 @@ export default function CampaignChart({
 
         {/* Legend */}
         {!isEmpty && !loading && !error && (
-          <div className="flex items-center gap-4 text-xs text-[#94A3B8]">
+          <div className="flex flex-wrap items-center gap-3 md:gap-4 text-xs text-[#94A3B8]">
             <span className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-[#2563EB]" />
               Sent
@@ -103,13 +118,13 @@ export default function CampaignChart({
 
       {/* Content */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center h-[220px]">
+        <div className="flex flex-col items-center justify-center" style={{ height: chartHeight }}>
           <div className="w-full h-full bg-[#182234] rounded-xl animate-pulse flex items-center justify-center text-xs text-[#94A3B8]">
             Loading performance data...
           </div>
         </div>
       ) : error ? (
-        <div className="flex flex-col items-center justify-center h-[220px] text-[#94A3B8] gap-2">
+        <div className="flex flex-col items-center justify-center text-[#94A3B8] gap-2" style={{ height: chartHeight }}>
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="1.5">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
@@ -127,7 +142,7 @@ export default function CampaignChart({
           )}
         </div>
       ) : isEmpty ? (
-        <div className="flex flex-col items-center justify-center h-[220px] text-[#94A3B8]">
+        <div className="flex flex-col items-center justify-center text-[#94A3B8]" style={{ height: chartHeight }}>
           <div className="w-12 h-12 rounded-full bg-[#182234] border border-[#26354D] flex items-center justify-center mb-3 text-[#94A3B8]">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
@@ -137,7 +152,7 @@ export default function CampaignChart({
           <p className="text-xs text-[#64748B] mt-1 text-center">Your campaign performance will appear here once you start sending emails.</p>
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={220}>
+        <ResponsiveContainer width="100%" height={chartHeight}>
           <AreaChart data={data} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id="sentGrad" x1="0" y1="0" x2="0" y2="1">
@@ -157,6 +172,7 @@ export default function CampaignChart({
               axisLine={false}
               tickLine={false}
               dy={8}
+              interval={tickInterval}
             />
             <YAxis
               tick={{ fontSize: 11, fill: '#64748B' }}
