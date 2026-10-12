@@ -35,6 +35,26 @@ export interface DashboardStatsResponse {
   recentCampaigns: ApiCampaign[];
 }
 
+export interface PerformanceDay {
+  date: string;
+  sent: number;
+  opened: number;
+}
+
+export interface RecentCampaignItem {
+  _id: string;
+  name: string;
+  projectName: string;
+  projectId?: { _id: string; name: string; slug?: string } | string;
+  status: string;
+  sentCount: number;
+  openedCount: number;
+  unsubscribedCount: number;
+  openRate: number;
+  sentAt?: string;
+  createdAt?: string;
+}
+
 // ── Fetch helpers ─────────────────────────────────────────────────────────────
 
 export async function fetchDashboardStats(project: string): Promise<DashboardStatsResponse> {
@@ -45,6 +65,32 @@ export async function fetchDashboardStats(project: string): Promise<DashboardSta
   const json = await res.json();
   if (!json.success) throw new Error(json.error ?? 'Unknown API error');
   return json.data as DashboardStatsResponse;
+}
+
+export async function getDashboardPerformance(projectId?: string, days = 14): Promise<PerformanceDay[]> {
+  const params = new URLSearchParams();
+  if (days) params.set('days', String(days));
+  if (projectId && projectId !== 'all') params.set('projectId', projectId);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  const url = `${API_BASE}/api/dashboard/performance${qs}`;
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Failed to fetch performance: ${res.status}`);
+  const json = await res.json();
+  if (!json.success) throw new Error(json.message ?? json.error ?? 'Failed to fetch performance');
+  return json.data as PerformanceDay[];
+}
+
+export async function getRecentCampaigns(projectId?: string, limit = 5): Promise<RecentCampaignItem[]> {
+  const params = new URLSearchParams();
+  if (limit) params.set('limit', String(limit));
+  if (projectId && projectId !== 'all') params.set('projectId', projectId);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  const url = `${API_BASE}/api/dashboard/recent-campaigns${qs}`;
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Failed to fetch recent campaigns: ${res.status}`);
+  const json = await res.json();
+  if (!json.success) throw new Error(json.message ?? json.error ?? 'Failed to fetch recent campaigns');
+  return json.data as RecentCampaignItem[];
 }
 
 export async function fetchProjects() {

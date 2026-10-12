@@ -6,8 +6,16 @@ import StatsCard from '@/components/dashboard/StatsCard';
 import CampaignChart from '@/components/dashboard/CampaignChart';
 import RecentCampaigns from '@/components/dashboard/RecentCampaigns';
 import { STAT_CHANGES_BY_PROJECT, CAMPAIGN_ICON_COLORS } from '@/lib/mockData';
-import { fetchDashboardStats } from '@/lib/api';
-import type { ApiStats, ApiCampaign } from '@/lib/api';
+import {
+  fetchDashboardStats,
+  getDashboardPerformance,
+  getRecentCampaigns,
+} from '@/lib/api';
+import type {
+  ApiStats,
+  PerformanceDay,
+  RecentCampaignItem,
+} from '@/lib/api';
 
 function getTodayString() {
   return new Date().toLocaleDateString('en-US', {
@@ -28,31 +36,86 @@ const EMPTY_STATS: ApiStats = {
 
 export default function DashboardPage() {
   const [selectedProject, setSelectedProject] = useState<string>('all');
-  const [stats, setStats] = useState<ApiStats>(EMPTY_STATS);
-  const [recentCampaigns, setRecentCampaigns] = useState<ApiCampaign[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [performanceDays, setPerformanceDays] = useState<number>(14);
 
-  const loadDashboard = useCallback(async (project: string) => {
-    setLoading(true);
-    setError(null);
+  // Top stats
+  const [stats, setStats] = useState<ApiStats>(EMPTY_STATS);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
+
+  // Performance chart
+  const [performanceData, setPerformanceData] = useState<PerformanceDay[]>([]);
+  const [performanceLoading, setPerformanceLoading] = useState(true);
+  const [performanceError, setPerformanceError] = useState<string | null>(null);
+
+  // Recent campaigns
+  const [recentCampaigns, setRecentCampaigns] = useState<RecentCampaignItem[]>([]);
+  const [recentCampaignsLoading, setRecentCampaignsLoading] = useState(true);
+  const [recentCampaignsError, setRecentCampaignsError] = useState<string | null>(null);
+
+  // Fetch top stats
+  const loadStats = useCallback(async (project: string) => {
+    setStatsLoading(true);
+    setStatsError(null);
     try {
       const data = await fetchDashboardStats(project);
       setStats(data.stats);
-      setRecentCampaigns(data.recentCampaigns);
     } catch (err: any) {
-      console.error('[Dashboard] API error:', err);
-      setError(err.message ?? 'Failed to load dashboard data');
+      console.error('[Dashboard] Stats API error:', err);
+      setStatsError(err.message ?? 'Failed to load dashboard statistics');
     } finally {
-      setLoading(false);
+      setStatsLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    loadDashboard(selectedProject);
-  }, [selectedProject, loadDashboard]);
+  // Fetch performance chart data
+  const loadPerformance = useCallback(async (project: string, days: number) => {
+    setPerformanceLoading(true);
+    setPerformanceError(null);
+    try {
+      const data = await getDashboardPerformance(project, days);
+      setPerformanceData(data);
+    } catch (err: any) {
+      console.error('[Dashboard] Performance API error:', err);
+      setPerformanceError(err.message ?? 'Failed to load campaign performance');
+    } finally {
+      setPerformanceLoading(false);
+    }
+  }, []);
 
-  // Use fallback mock changes for now - TODO: get these from backend when trend data is implemented
+  // Fetch recent campaigns
+  const loadRecent = useCallback(async (project: string) => {
+    setRecentCampaignsLoading(true);
+    setRecentCampaignsError(null);
+    try {
+      const data = await getRecentCampaigns(project, 5);
+      setRecentCampaigns(data);
+    } catch (err: any) {
+      console.error('[Dashboard] Recent campaigns API error:', err);
+      setRecentCampaignsError(err.message ?? 'Failed to load recent campaigns');
+    } finally {
+      setRecentCampaignsLoading(false);
+    }
+  }, []);
+
+  // Load everything when selectedProject changes
+  useEffect(() => {
+    loadStats(selectedProject);
+    loadRecent(selectedProject);
+  }, [selectedProject, loadStats, loadRecent]);
+
+  // Load performance when selectedProject or performanceDays changes
+  useEffect(() => {
+    loadPerformance(selectedProject, performanceDays);
+  }, [selectedProject, performanceDays, loadPerformance]);
+
+  const handleRetryAll = () => {
+    loadStats(selectedProject);
+    loadPerformance(selectedProject, performanceDays);
+    loadRecent(selectedProject);
+  };
+
+  // Fallback mock changes for stat cards
   const changes = STAT_CHANGES_BY_PROJECT['all'] || {
     totalLeadsChange: 0,
     emailsFoundChange: 0,
@@ -113,14 +176,14 @@ export default function DashboardPage() {
           <span className="text-sm text-gray-400 font-medium hidden md:block">{getTodayString()}</span>
         </div>
 
-        {/* Error banner — only shown if backend is down */}
-        {error && (
+        {/* Global error banner if stats failed */}
+        {statsError && (
           <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-xl px-4 py-3">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
               <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
-            <span>Backend unreachable — showing cached data. <span className="font-medium">{error}</span></span>
-            <button onClick={() => loadDashboard(selectedProject)} className="ml-auto text-xs font-semibold underline hover:no-underline">Retry</button>
+            <span>Backend unreachable — showing cached data. <span className="font-medium">{statsError}</span></span>
+            <button onClick={handleRetryAll} className="ml-auto text-xs font-semibold underline hover:no-underline">Retry all</button>
           </div>
         )}
 
@@ -132,22 +195,30 @@ export default function DashboardPage() {
               title={card.title}
               value={card.value}
               change={card.change}
-              loading={loading}
+              loading={statsLoading}
             />
           ))}
         </div>
 
         {/* Chart + Recent Campaigns */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
           <div className="lg:col-span-3">
-            <CampaignChart data={[]} showEmptyState={true} />
+            <CampaignChart
+              data={performanceData}
+              days={performanceDays}
+              onDaysChange={setPerformanceDays}
+              loading={performanceLoading}
+              error={performanceError}
+              onRetry={() => loadPerformance(selectedProject, performanceDays)}
+            />
           </div>
           <div className="lg:col-span-2">
             <RecentCampaigns
               campaigns={recentCampaigns}
               iconColors={CAMPAIGN_ICON_COLORS}
-              loading={loading}
-              showEmptyState={true}
+              loading={recentCampaignsLoading}
+              error={recentCampaignsError}
+              onRetry={() => loadRecent(selectedProject)}
             />
           </div>
         </div>
