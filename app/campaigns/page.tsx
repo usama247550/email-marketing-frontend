@@ -185,17 +185,17 @@ export default function CampaignsPage() {
     <div className="flex flex-col flex-1 min-h-screen bg-gray-50">
       <Topbar selectedProject={selectedProject} onProjectChange={handleProjectChange} />
       
-      <div className="flex-1 px-7 py-6">
-        <div className="max-w-[1400px] w-full mx-auto">
+      <div className="flex-1 px-4 py-4 md:px-6 lg:px-7 md:py-6">
+        <div className="max-w-[1400px] w-full mx-auto space-y-5 md:space-y-6 min-w-0">
           {/* Header */}
-          <div className="flex items-start justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Campaigns</h1>
               <p className="text-sm text-gray-400 mt-0.5">View your sent email campaigns.</p>
             </div>
             <button
               onClick={() => router.push('/sending')}
-              className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors shrink-0"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-4 py-2.5 min-h-[40px] rounded-lg transition-colors shrink-0"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19"/>
@@ -206,8 +206,8 @@ export default function CampaignsPage() {
           </div>
 
           {/* Search and Pagination Info */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex-1 max-w-md">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex-1 sm:max-w-md">
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -223,14 +223,14 @@ export default function CampaignsPage() {
                     setSearchQuery(e.target.value);
                     setCurrentPage(1); // Reset to first page on search
                   }}
-                  className="w-full bg-white border border-gray-200 rounded-lg pl-10 pr-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all"
+                  className="w-full bg-white border border-gray-200 rounded-lg pl-10 pr-4 py-2.5 min-h-[40px] text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all"
                 />
               </div>
             </div>
 
             {/* Pagination Info */}
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-500">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+              <span className="text-xs sm:text-sm text-gray-500">
                 {totalCampaigns > 0 ? (
                   <>
                     {startIndex + 1}-{endIndex} of {totalCampaigns}, page {currentPage} of {totalPages}
@@ -241,11 +241,11 @@ export default function CampaignsPage() {
               </span>
               
               {/* Pagination Controls */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  className="flex items-center justify-center w-8 h-8 rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-gray-600 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center justify-center w-10 h-10 min-w-[40px] min-h-[40px] rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-gray-600 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="15 18 9 12 15 6"/>
@@ -254,7 +254,7 @@ export default function CampaignsPage() {
                 <button
                   onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
-                  className="flex items-center justify-center w-8 h-8 rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-gray-600 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center justify-center w-10 h-10 min-w-[40px] min-h-[40px] rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-gray-600 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="9 18 15 12 9 6"/>
@@ -303,137 +303,176 @@ export default function CampaignsPage() {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Campaign
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Sent
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Recipients
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Opens
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Unsubscribed
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {paginatedCampaigns.map((campaign) => (
-                      <tr 
-                        key={campaign.id} 
-                        onClick={() => handleRowClick(campaign)}
-                        className="hover:bg-gray-50 cursor-pointer transition-colors"
-                      >
-                        <td className="px-6 py-4">
-                          <div>
-                            <div className="text-sm font-semibold text-gray-900 mb-1">
-                              {campaign.name}
+              <>
+                {/* Mobile campaign cards (< md) */}
+                <div className="md:hidden divide-y divide-gray-100">
+                  {paginatedCampaigns.map((campaign) => (
+                    <div
+                      key={campaign.id}
+                      onClick={() => handleRowClick(campaign)}
+                      className="p-4 space-y-3 cursor-pointer active:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2 min-w-0">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-gray-900 truncate" title={campaign.name}>
+                            {campaign.name}
+                          </div>
+                          <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                            {campaign.projectName}
+                          </span>
+                        </div>
+                        {/* "..." menu */}
+                        <div className="relative shrink-0">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowMenu(showMenu === campaign.id ? null : campaign.id);
+                            }}
+                            className="flex items-center justify-center w-10 h-10 min-w-[40px] min-h-[40px] rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="1"/>
+                              <circle cx="12" cy="5" r="1"/>
+                              <circle cx="12" cy="19" r="1"/>
+                            </svg>
+                          </button>
+                          {showMenu === campaign.id && (
+                            <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleRowClick(campaign); setShowMenu(null); }}
+                                className="w-full text-left px-3 py-2.5 min-h-[40px] text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                              >View</button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setShowMenu(null); }}
+                                className="w-full text-left px-3 py-2.5 min-h-[40px] text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                              >Duplicate</button>
+                              <hr className="my-1 border-gray-100" />
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteCampaign(campaign); }}
+                                className="w-full text-left px-3 py-2.5 min-h-[40px] text-sm text-red-600 hover:bg-red-50 transition-colors"
+                              >Delete</button>
                             </div>
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                              {campaign.projectName}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          Sent on {formatSentDate(campaign.sentDate)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {campaign.recipients.toLocaleString()}
-                          </div>
-                          <div className="text-xs text-gray-500">100%</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {campaign.opens.toLocaleString()}
-                          </div>
-                          <div className="text-xs text-gray-500">{campaign.openRate.toFixed(1)}%</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {campaign.unsubscribed.toLocaleString()}
-                          </div>
-                          <div className="text-xs text-gray-500">{campaign.unsubscribeRate.toFixed(1)}%</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <div className="relative">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation(); // Prevent row click
-                                setShowMenu(showMenu === campaign.id ? null : campaign.id);
-                              }}
-                              className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <circle cx="12" cy="12" r="1"/>
-                                <circle cx="12" cy="5" r="1"/>
-                                <circle cx="12" cy="19" r="1"/>
-                              </svg>
-                            </button>
-                            
-                            {/* Dropdown Menu */}
-                            {showMenu === campaign.id && (
-                              <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRowClick(campaign);
-                                    setShowMenu(null);
-                                  }}
-                                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                >
-                                  View
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    // TODO: Implement duplicate functionality
-                                    setShowMenu(null);
-                                  }}
-                                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                >
-                                  Duplicate
-                                </button>
-                                <hr className="my-1 border-gray-100" />
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteCampaign(campaign);
-                                  }}
-                                  className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </td>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {formatSentDate(campaign.sentDate)}
+                      </div>
+                      {/* 3-column stat grid */}
+                      <div className="grid grid-cols-3 gap-2 text-center bg-gray-50 rounded-lg p-2.5">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{campaign.recipients.toLocaleString()}</div>
+                          <div className="text-[10px] text-gray-500 mt-0.5">Recipients</div>
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{campaign.opens.toLocaleString()}</div>
+                          <div className="text-[10px] text-gray-500 mt-0.5">Opens ({campaign.openRate.toFixed(0)}%)</div>
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{campaign.unsubscribed.toLocaleString()}</div>
+                          <div className="text-[10px] text-gray-500 mt-0.5">Unsub</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop campaign table (md+) */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Campaign</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sent</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recipients</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Opens</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unsubscribed</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {paginatedCampaigns.map((campaign) => (
+                        <tr 
+                          key={campaign.id} 
+                          onClick={() => handleRowClick(campaign)}
+                          className="hover:bg-gray-50 cursor-pointer transition-colors"
+                        >
+                          <td className="px-6 py-4">
+                            <div>
+                              <div className="text-sm font-semibold text-gray-900 mb-1 truncate max-w-xs" title={campaign.name}>
+                                {campaign.name}
+                              </div>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                                {campaign.projectName}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            Sent on {formatSentDate(campaign.sentDate)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{campaign.recipients.toLocaleString()}</div>
+                            <div className="text-xs text-gray-500">100%</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{campaign.opens.toLocaleString()}</div>
+                            <div className="text-xs text-gray-500">{campaign.openRate.toFixed(1)}%</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{campaign.unsubscribed.toLocaleString()}</div>
+                            <div className="text-xs text-gray-500">{campaign.unsubscribeRate.toFixed(1)}%</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                            <div className="relative">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowMenu(showMenu === campaign.id ? null : campaign.id);
+                                }}
+                                className="flex items-center justify-center w-10 h-10 min-w-[40px] min-h-[40px] rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <circle cx="12" cy="12" r="1"/>
+                                  <circle cx="12" cy="5" r="1"/>
+                                  <circle cx="12" cy="19" r="1"/>
+                                </svg>
+                              </button>
+                              {showMenu === campaign.id && (
+                                <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleRowClick(campaign); setShowMenu(null); }}
+                                    className="w-full text-left px-3 py-2.5 min-h-[40px] text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                  >View</button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setShowMenu(null); }}
+                                    className="w-full text-left px-3 py-2.5 min-h-[40px] text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                  >Duplicate</button>
+                                  <hr className="my-1 border-gray-100" />
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteCampaign(campaign); }}
+                                    className="w-full text-left px-3 py-2.5 min-h-[40px] text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                  >Delete</button>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
 
           {/* Bottom Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-center mt-6">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <button
                   onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+                  className="px-3 py-2 min-h-[40px] text-sm font-medium text-gray-500 bg-white border border-gray-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
                 >
                   Previous
                 </button>
@@ -456,7 +495,7 @@ export default function CampaignsPage() {
                       <button
                         key={pageNum}
                         onClick={() => handlePageChange(pageNum)}
-                        className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                        className={`w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center text-sm font-medium rounded-lg transition-colors ${
                           currentPage === pageNum
                             ? 'bg-accent text-white'
                             : 'text-gray-500 bg-white border border-gray-200 hover:bg-gray-50'
@@ -471,7 +510,7 @@ export default function CampaignsPage() {
                 <button
                   onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
-                  className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+                  className="px-3 py-2 min-h-[40px] text-sm font-medium text-gray-500 bg-white border border-gray-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
                 >
                   Next
                 </button>
@@ -483,12 +522,12 @@ export default function CampaignsPage() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && campaignToDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Delete Campaign</h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full max-h-[90dvh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="px-5 sm:px-6 py-4 border-b border-gray-200 shrink-0">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">Delete Campaign</h2>
             </div>
-            <div className="p-6">
+            <div className="p-5 sm:p-6 overflow-y-auto flex-1">
               <div className="flex items-start gap-3 mb-4">
                 <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-600">
@@ -497,29 +536,29 @@ export default function CampaignsPage() {
                     <line x1="12" y1="17" x2="12.01" y2="17"/>
                   </svg>
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-base font-medium text-gray-900 mb-2">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm sm:text-base font-medium text-gray-900 mb-2">
                     Are you sure you want to delete this campaign?
                   </h3>
-                  <p className="text-sm text-gray-500 mb-3">
+                  <p className="text-sm text-gray-500 break-words">
                     You are about to delete &quot;<strong>{campaignToDelete.name}</strong>&quot;. This action cannot be undone.
                   </p>
                 </div>
               </div>
-              <div className="flex gap-3 justify-end">
-                <button
-                  onClick={cancelDeleteCampaign}
-                  className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDeleteCampaign}
-                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
-                >
-                  Delete Campaign
-                </button>
-              </div>
+            </div>
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex flex-col-reverse sm:flex-row gap-3 justify-end shrink-0">
+              <button
+                onClick={cancelDeleteCampaign}
+                className="w-full sm:w-auto px-4 py-2.5 min-h-[40px] text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-center"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteCampaign}
+                className="w-full sm:w-auto px-4 py-2.5 min-h-[40px] text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors text-center"
+              >
+                Delete Campaign
+              </button>
             </div>
           </div>
         </div>

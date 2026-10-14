@@ -557,11 +557,11 @@ export default function AutomationPage() {
     <div className="flex flex-col flex-1 min-h-screen bg-gray-50">
       <Topbar selectedProject={selectedProject} onProjectChange={setSelectedProject} />
 
-      <div className="flex-1 px-7 py-6">
-        <div className="max-w-[1400px] w-full mx-auto">
+      <div className="flex-1 px-4 py-4 md:px-6 lg:px-7 md:py-6">
+        <div className="max-w-[1400px] w-full mx-auto space-y-5 md:space-y-6 min-w-0">
 
           {/* ── Header ── */}
-          <div className="flex items-start justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Automation</h1>
               <p className="text-sm text-gray-400 mt-0.5">
@@ -570,7 +570,7 @@ export default function AutomationPage() {
             </div>
             <button
               onClick={openCreate}
-              className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors shrink-0"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-4 py-2.5 min-h-[44px] rounded-lg transition-colors shrink-0"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19" />
@@ -630,8 +630,111 @@ export default function AutomationPage() {
               </button>
             </div>
           ) : (
-            /* ── Table ── */
+            /* ── Automations list ── */
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              {/* Mobile card view */}
+              <div className="md:hidden divide-y divide-gray-100">
+                {automations.map((automation) => (
+                  <div key={automation._id} className="p-4 space-y-3">
+                    {/* Name */}
+                    <div className="text-sm font-semibold text-gray-900 truncate" title={automation.name}>
+                      {automation.name}
+                    </div>
+
+                    {/* Tags: project, template, finder badge */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {automation.projectId == null ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-600 border border-red-200">
+                          ⚠ Project deleted
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                          {getName(automation.projectId)}
+                        </span>
+                      )}
+                      {automation.templateId == null ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-600 border border-red-200">
+                          ⚠ Template deleted
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                          {getName(automation.templateId)}
+                        </span>
+                      )}
+                      {automation.leadSource === 'finder' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-emerald-600">
+                            <circle cx="11" cy="11" r="8"/>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                          </svg>
+                          {formatFinderBadge(automation.finder)}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Schedule + last run info */}
+                    <div className="grid grid-cols-2 gap-2 text-xs bg-gray-50 rounded-lg p-2.5">
+                      <div>
+                        <div className="text-gray-500">Schedule</div>
+                        <div className="text-gray-900 font-medium mt-0.5">{formatTime(automation.scheduledTime)} daily</div>
+                        <div className="text-gray-500 mt-0.5">{automation.dailyLimit} emails/day</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">Last Run</div>
+                        {automation.lastRunAt ? (
+                          <>
+                            <div className="text-gray-900 font-medium mt-0.5">{formatDate(automation.lastRunAt)}</div>
+                            <div className="text-gray-500 mt-0.5">{formatLastRunSummary(automation)}</div>
+                          </>
+                        ) : (
+                          <div className="text-gray-400 mt-0.5">Never run yet</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Status + actions row */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <StatusToggle
+                          status={automation.status}
+                          disabled={togglingIds.has(automation._id)}
+                          onToggle={() => handleToggleStatus(automation)}
+                        />
+                        <span className={`text-xs font-medium ${
+                          automation.status === 'active' ? 'text-green-600' : 'text-gray-400'
+                        }`}>
+                          {automation.status === 'active' ? 'Active' : 'Paused'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => openEdit(automation)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 min-h-[40px] text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-accent transition-colors"
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                          </svg>
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget(automation)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 min-h-[40px] text-xs font-medium text-gray-400 bg-white border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="m19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                          </svg>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop table view (md+) */}
+              <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
@@ -646,8 +749,8 @@ export default function AutomationPage() {
                   {automations.map((automation) => (
                     <tr key={automation._id} className="hover:bg-gray-50 transition-colors">
                       {/* Name / Project / Template / Lead Finder Badge */}
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-semibold text-gray-900 mb-1">
+                      <td className="px-6 py-4 min-w-0">
+                        <div className="text-sm font-semibold text-gray-900 mb-1 truncate max-w-xs" title={automation.name}>
                           {automation.name}
                         </div>
                         <div className="flex flex-wrap gap-1.5 mt-1">
@@ -729,7 +832,7 @@ export default function AutomationPage() {
                           <button
                             onClick={() => openEdit(automation)}
                             title="Edit"
-                            className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                            className="flex items-center justify-center w-10 h-10 min-w-[40px] min-h-[40px] rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
                           >
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -739,7 +842,7 @@ export default function AutomationPage() {
                           <button
                             onClick={() => setDeleteTarget(automation)}
                             title="Delete"
-                            className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            className="flex items-center justify-center w-10 h-10 min-w-[40px] min-h-[40px] rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                           >
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="3 6 5 6 21 6"/>
@@ -752,6 +855,7 @@ export default function AutomationPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </div>
@@ -759,19 +863,19 @@ export default function AutomationPage() {
 
       {/* ── Create / Edit Modal ────────────────────────────────────────────── */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-xl">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
+          <div className="bg-white rounded-xl w-full max-w-xl max-h-[90dvh] flex flex-col shadow-2xl overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
-              <h2 className="text-base font-semibold text-gray-900">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200 shrink-0">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">
                 {editingId ? 'Edit Automation' : 'Create Automation'}
               </h2>
               <button
                 onClick={closeForm}
                 disabled={saving}
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50"
+                className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18"/>
                   <line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
@@ -779,7 +883,7 @@ export default function AutomationPage() {
             </div>
 
             {/* Body */}
-            <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1">
+            <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-5 overflow-y-auto flex-1">
               {/* API-level error */}
               {formErrors._api && (
                 <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3.5 py-3">
@@ -1146,7 +1250,7 @@ export default function AutomationPage() {
               )}
 
               {/* Daily Limit + Time */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Max emails per day <span className="text-red-500">*</span>
@@ -1157,7 +1261,7 @@ export default function AutomationPage() {
                     max={500}
                     value={form.dailyLimit}
                     onChange={e => setForm(f => ({ ...f, dailyLimit: parseInt(e.target.value) || 1 }))}
-                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all"
+                    className="w-full px-3 py-2.5 min-h-[40px] text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all"
                   />
                   {formErrors.dailyLimit && <p className="mt-1 text-xs text-red-500">{formErrors.dailyLimit}</p>}
                 </div>
@@ -1169,7 +1273,7 @@ export default function AutomationPage() {
                     type="time"
                     value={form.scheduledTime}
                     onChange={e => setForm(f => ({ ...f, scheduledTime: e.target.value }))}
-                    className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all ${
+                    className={`w-full px-3 py-2.5 min-h-[40px] text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all ${
                       formErrors.scheduledTime ? 'border-red-400' : 'border-gray-200'
                     }`}
                   />
@@ -1179,18 +1283,18 @@ export default function AutomationPage() {
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl shrink-0">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 px-4 sm:px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl shrink-0">
               <button
                 onClick={closeForm}
                 disabled={saving}
-                className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                className="w-full sm:w-auto px-4 py-2.5 min-h-[44px] text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 text-center"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving || !isFormValid}
-                className="px-5 py-2 text-sm font-semibold text-white bg-accent hover:bg-accent-hover rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="w-full sm:w-auto px-5 py-2.5 min-h-[44px] text-sm font-semibold text-white bg-accent hover:bg-accent-hover rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {saving && (
                   <span className="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -1204,13 +1308,13 @@ export default function AutomationPage() {
 
       {/* ── Delete Confirm Modal ──────────────────────────────────────────── */}
       {deleteTarget && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full shadow-xl">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-base font-semibold text-gray-900">Delete Automation</h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full max-h-[90dvh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="px-5 sm:px-6 py-4 border-b border-gray-200 shrink-0">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">Delete Automation</h2>
             </div>
-            <div className="p-6">
-              <div className="flex items-start gap-3 mb-5">
+            <div className="p-5 sm:p-6 overflow-y-auto flex-1">
+              <div className="flex items-start gap-3 mb-4">
                 <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-600">
                     <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
@@ -1218,34 +1322,34 @@ export default function AutomationPage() {
                     <line x1="12" y1="17" x2="12.01" y2="17"/>
                   </svg>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-900 mb-1">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm sm:text-base font-medium text-gray-900 mb-2">
                     Are you sure you want to delete this automation?
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-500 break-words">
                     &ldquo;<strong>{deleteTarget.name}</strong>&rdquo; will be permanently removed. This action cannot be undone.
                   </p>
                 </div>
               </div>
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setDeleteTarget(null)}
-                  disabled={deleting}
-                  className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDelete}
-                  disabled={deleting}
-                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-70 flex items-center gap-2"
-                >
-                  {deleting && (
-                    <span className="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                  )}
-                  Delete
-                </button>
-              </div>
+            </div>
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex flex-col-reverse sm:flex-row gap-3 justify-end shrink-0">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="w-full sm:w-auto px-4 py-2.5 min-h-[44px] text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 text-center"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleting}
+                className="w-full sm:w-auto px-4 py-2.5 min-h-[44px] text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
+              >
+                {deleting && (
+                  <span className="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                )}
+                Delete
+              </button>
             </div>
           </div>
         </div>

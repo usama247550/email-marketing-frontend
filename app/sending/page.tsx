@@ -269,12 +269,12 @@ function SendingPageContent() {
     <div className="flex flex-col flex-1 min-h-screen bg-gray-50">
       <Topbar selectedProject={selectedProjectId} onProjectChange={handleProjectChange} />
       
-      <div className="flex-1 px-7 py-6">
-        <div className="max-w-4xl">
+      <div className="flex-1 px-4 py-4 md:px-6 lg:px-7 md:py-6">
+        <div className="max-w-4xl w-full space-y-5 md:space-y-6 min-w-0">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold text-gray-900">
+              <h1 className="text-lg sm:text-xl font-semibold text-gray-900">
                 {isViewMode ? 'Campaign Details' : 'New Send'}
               </h1>
               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
@@ -285,7 +285,7 @@ function SendingPageContent() {
               <button
                 onClick={() => setShowConfirmModal(true)}
                 disabled={!canSend || sending}
-                className={`px-6 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
+                className={`w-full sm:w-auto px-6 py-2.5 min-h-[40px] text-sm font-semibold rounded-lg transition-colors text-center ${
                   canSend && !sending
                     ? 'bg-gray-900 hover:bg-gray-800 text-white'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -332,8 +332,8 @@ function SendingPageContent() {
               {/* Stacked Sections */}
               <div className="bg-white rounded-xl border border-gray-100 divide-y divide-gray-100">
             {/* Project Section */}
-            <div className="p-6 flex items-center justify-between">
-              <div className="flex items-center gap-4">
+            <div className="p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-4 min-w-0">
                 <div className="flex-shrink-0">
                   {selectedProject ? (
                     <CheckIcon />
@@ -341,12 +341,12 @@ function SendingPageContent() {
                     <div className="w-5 h-5 border-2 border-gray-300 rounded-full" />
                   )}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className="text-sm font-semibold text-gray-900">Project</h3>
                   {selectedProject ? (
-                    <div className="text-sm text-gray-600 mt-1">
-                      <div className="font-medium">{selectedProject.name}</div>
-                      <div className="text-gray-500">{selectedProject.senderEmail}</div>
+                    <div className="text-sm text-gray-600 mt-1 min-w-0">
+                      <div className="font-medium truncate" title={selectedProject.name}>{selectedProject.name}</div>
+                      <div className="text-gray-500 truncate" title={selectedProject.senderEmail}>{selectedProject.senderEmail}</div>
                     </div>
                   ) : (
                     <p className="text-sm text-gray-500 mt-1">Choose which project to send from</p>
@@ -356,7 +356,7 @@ function SendingPageContent() {
               <button
                 onClick={() => setShowProjectModal(true)}
                 disabled={isViewMode}
-                className={`text-sm font-medium px-4 py-2 rounded-lg border transition-colors ${
+                className={`w-full sm:w-auto shrink-0 text-sm font-medium px-4 py-2.5 min-h-[40px] rounded-lg border transition-colors text-center ${
                   isViewMode
                     ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
                     : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
@@ -367,8 +367,8 @@ function SendingPageContent() {
             </div>
 
             {/* Leads Section */}
-            <div className="p-6 flex items-center justify-between">
-              <div className="flex items-center gap-4">
+            <div className="p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-4 min-w-0">
                 <div className="flex-shrink-0">
                   {selectedBatches.length > 0 ? (
                     <CheckIcon />
@@ -390,7 +390,7 @@ function SendingPageContent() {
               <button
                 onClick={() => setShowLeadsModal(true)}
                 disabled={isViewMode}
-                className={`text-sm font-medium px-4 py-2 rounded-lg border transition-colors ${
+                className={`w-full sm:w-auto shrink-0 text-sm font-medium px-4 py-2.5 min-h-[40px] rounded-lg border transition-colors text-center ${
                   isViewMode
                     ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
                     : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
@@ -401,8 +401,8 @@ function SendingPageContent() {
             </div>
 
             {/* Template Section */}
-            <div className="p-6 flex items-center justify-between">
-              <div className="flex items-center gap-4">
+            <div className="p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-4 min-w-0">
                 <div className="flex-shrink-0">
                   {selectedTemplate ? (
                     <CheckIcon />
@@ -410,12 +410,12 @@ function SendingPageContent() {
                     <div className="w-5 h-5 border-2 border-gray-300 rounded-full" />
                   )}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className="text-sm font-semibold text-gray-900">Template</h3>
                   {selectedTemplate ? (
-                    <div className="text-sm text-gray-600 mt-1">
-                      <div className="font-medium">{selectedTemplate.name}</div>
-                      <div className="text-gray-500">{selectedTemplate.subject}</div>
+                    <div className="text-sm text-gray-600 mt-1 min-w-0">
+                      <div className="font-medium truncate" title={selectedTemplate.name}>{selectedTemplate.name}</div>
+                      <div className="text-gray-500 truncate" title={selectedTemplate.subject}>{selectedTemplate.subject}</div>
                     </div>
                   ) : (
                     <p className="text-sm text-gray-500 mt-1">Select an email template</p>
@@ -425,7 +425,7 @@ function SendingPageContent() {
               <button
                 onClick={() => setShowTemplateModal(true)}
                 disabled={isViewMode}
-                className={`text-sm font-medium px-4 py-2 rounded-lg border transition-colors ${
+                className={`w-full sm:w-auto shrink-0 text-sm font-medium px-4 py-2.5 min-h-[40px] rounded-lg border transition-colors text-center ${
                   isViewMode
                     ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
                     : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
@@ -437,10 +437,10 @@ function SendingPageContent() {
               </div>
               
               {/* Email Preview */}
-              <div className="mt-8 bg-white rounded-xl border border-gray-100 p-6">
+              <div className="mt-6 md:mt-8 bg-white rounded-xl border border-gray-100 p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Preview</h3>
             {selectedTemplate ? (
-              <div className="border border-gray-200 rounded-lg overflow-hidden max-w-md mx-auto">
+              <div className="border border-gray-200 rounded-lg overflow-hidden w-full max-w-md mx-auto">
                 {/* Phone-style email header */}
                 <div className="bg-gray-50 border-b border-gray-200 px-4 py-3">
                   <div className="text-xs text-gray-500 mb-1">From: {selectedProject?.senderEmail || 'sender@example.com'}</div>
@@ -474,13 +474,13 @@ function SendingPageContent() {
 
           {/* Project Selection Modal */}
           {showProjectModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-xl p-6 max-w-md w-full">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Choose Project</h3>
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
+              <div className="bg-white rounded-xl max-w-md w-full max-h-[90dvh] flex flex-col shadow-2xl overflow-hidden">
+                <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-gray-200 shrink-0">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900">Choose Project</h3>
                   <button
                     onClick={() => setShowProjectModal(false)}
-                    className="text-gray-400 hover:text-gray-600"
+                    className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
                   >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <line x1="18" y1="6" x2="6" y2="18"/>
@@ -488,7 +488,7 @@ function SendingPageContent() {
                     </svg>
                   </button>
                 </div>
-                <div className="space-y-2">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-2">
                   {projects.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
                       <p className="text-sm">No projects found</p>
@@ -506,8 +506,8 @@ function SendingPageContent() {
                         }}
                         className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-accent hover:bg-accent/5 transition-all"
                       >
-                        <div className="font-medium text-gray-900">{project.name}</div>
-                        <div className="text-sm text-gray-500">{project.senderEmail}</div>
+                        <div className="font-medium text-gray-900 truncate" title={project.name}>{project.name}</div>
+                        <div className="text-sm text-gray-500 truncate" title={project.senderEmail}>{project.senderEmail}</div>
                       </button>
                     ))
                   )}
@@ -517,13 +517,13 @@ function SendingPageContent() {
           )}
           {/* Leads Selection Modal */}
           {showLeadsModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-xl p-6 max-w-2xl w-full max-h-[80vh] flex flex-col">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Choose Leads</h3>
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
+                <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90dvh] flex flex-col shadow-2xl overflow-hidden">
+                <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-gray-200 shrink-0">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900">Choose Leads</h3>
                   <button
                     onClick={() => setShowLeadsModal(false)}
-                    className="text-gray-400 hover:text-gray-600"
+                    className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
                   >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <line x1="18" y1="6" x2="6" y2="18"/>
@@ -532,19 +532,19 @@ function SendingPageContent() {
                   </button>
                 </div>
                 
-                {/* Search */}
-                <div className="mb-4">
+                {/* Search - sticky below header */}
+                <div className="px-5 sm:px-6 py-3 shrink-0">
                   <input
                     type="text"
                     placeholder="Search batches..."
                     value={batchSearch}
                     onChange={(e) => setBatchSearch(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
+                    className="w-full px-3 py-2.5 min-h-[40px] border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
                   />
                 </div>
 
                 {/* Batch list */}
-                <div className="flex-1 overflow-y-auto space-y-2 max-h-96">
+                <div className="flex-1 overflow-y-auto px-5 sm:px-6 space-y-2">
                   {filteredBatches.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
                       <p className="text-sm">No batches found</p>
@@ -557,17 +557,17 @@ function SendingPageContent() {
                       return (
                         <label
                           key={batch._id}
-                          className="flex items-center p-3 border border-gray-200 rounded-lg hover:border-accent hover:bg-accent/5 cursor-pointer transition-all"
+                          className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg hover:border-accent hover:bg-accent/5 cursor-pointer transition-all"
                         >
                           <input
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => handleBatchToggle(batch)}
-                            className="mr-3 w-4 h-4 text-accent focus:ring-accent border-gray-300 rounded"
+                            className="mt-0.5 mr-0 w-4 h-4 text-accent focus:ring-accent border-gray-300 rounded shrink-0"
                           />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <div className="font-medium text-gray-900">{batch.name}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                              <div className="font-medium text-gray-900 truncate" title={batch.name}>{batch.name}</div>
                               <div className="flex items-center gap-2">
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                                   batch.source === 'Lead Finder Agent' 
@@ -589,10 +589,10 @@ function SendingPageContent() {
                 </div>
 
                 {/* Done button */}
-                <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="px-5 sm:px-6 py-4 border-t border-gray-200 bg-gray-50 shrink-0">
                   <button
                     onClick={() => setShowLeadsModal(false)}
-                    className="w-full bg-accent hover:bg-accent-hover text-white text-sm font-semibold py-2.5 rounded-lg transition-colors"
+                    className="w-full bg-accent hover:bg-accent-hover text-white text-sm font-semibold py-2.5 min-h-[40px] rounded-lg transition-colors"
                   >
                     Done ({selectedBatches.length} selected)
                   </button>
@@ -602,13 +602,13 @@ function SendingPageContent() {
           )}
           {/* Template Selection Modal */}
           {showTemplateModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-xl p-6 max-w-2xl w-full max-h-[80vh] flex flex-col">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Choose Template</h3>
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
+              <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90dvh] flex flex-col shadow-2xl overflow-hidden">
+                <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-gray-200 shrink-0">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900">Choose Template</h3>
                   <button
                     onClick={() => setShowTemplateModal(false)}
-                    className="text-gray-400 hover:text-gray-600"
+                    className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
                   >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <line x1="18" y1="6" x2="6" y2="18"/>
@@ -618,18 +618,18 @@ function SendingPageContent() {
                 </div>
                 
                 {/* Search */}
-                <div className="mb-4">
+                <div className="px-5 sm:px-6 py-3 shrink-0">
                   <input
                     type="text"
                     placeholder="Search templates..."
                     value={templateSearch}
                     onChange={(e) => setTemplateSearch(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
+                    className="w-full px-3 py-2.5 min-h-[40px] border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
                   />
                 </div>
 
                 {/* Template list */}
-                <div className="flex-1 overflow-y-auto space-y-2 max-h-96">
+                <div className="flex-1 overflow-y-auto px-5 sm:px-6 pb-5 space-y-2">
                   {filteredTemplates.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
                       <p className="text-sm">No templates found</p>
@@ -645,8 +645,8 @@ function SendingPageContent() {
                         }}
                         className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-accent hover:bg-accent/5 transition-all"
                       >
-                        <div className="font-medium text-gray-900">{template.name}</div>
-                        <div className="text-sm text-gray-500 mt-1 truncate">{template.subject}</div>
+                        <div className="font-medium text-gray-900 truncate" title={template.name}>{template.name}</div>
+                        <div className="text-sm text-gray-500 mt-1 truncate" title={template.subject}>{template.subject}</div>
                       </button>
                     ))
                   )}
@@ -657,9 +657,9 @@ function SendingPageContent() {
 
           {/* Confirmation Modal */}
           {showConfirmModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-xl p-6 max-w-md w-full">
-                <div className="flex items-center gap-3 mb-4">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
+              <div className="bg-white rounded-xl max-w-md w-full max-h-[90dvh] flex flex-col shadow-2xl overflow-hidden">
+                <div className="flex items-center gap-3 px-5 sm:px-6 py-4 border-b border-gray-200 shrink-0">
                   <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-600">
                       <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
@@ -669,39 +669,41 @@ function SendingPageContent() {
                   <h3 className="text-lg font-semibold text-gray-900">Confirm Send</h3>
                 </div>
                 
-                <div className="space-y-3 mb-6 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Project:</span>
-                    <span className="font-medium text-gray-900">{selectedProject?.name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Sender:</span>
-                    <span className="text-gray-700">{selectedProject?.senderEmail}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Batches:</span>
-                    <span className="text-gray-700">{selectedBatches.length}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Valid leads:</span>
-                    <span className="text-gray-700 font-medium">{getTotalValidLeads()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Template:</span>
-                    <span className="text-gray-700">{selectedTemplate?.name}</span>
+                <div className="px-5 sm:px-6 py-4 overflow-y-auto flex-1">
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between gap-3">
+                      <span className="text-gray-500 shrink-0">Project:</span>
+                      <span className="font-medium text-gray-900 text-right truncate" title={selectedProject?.name}>{selectedProject?.name}</span>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <span className="text-gray-500 shrink-0">Sender:</span>
+                      <span className="text-gray-700 text-right truncate" title={selectedProject?.senderEmail}>{selectedProject?.senderEmail}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Batches:</span>
+                      <span className="text-gray-700">{selectedBatches.length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Valid leads:</span>
+                      <span className="text-gray-700 font-medium">{getTotalValidLeads()}</span>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <span className="text-gray-500 shrink-0">Template:</span>
+                      <span className="text-gray-700 text-right truncate" title={selectedTemplate?.name}>{selectedTemplate?.name}</span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="p-4 bg-gray-50 border-t border-gray-100 flex flex-col-reverse sm:flex-row gap-3 shrink-0">
                   <button
                     onClick={() => setShowConfirmModal(false)}
-                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold py-2.5 rounded-lg transition-colors"
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold py-2.5 min-h-[40px] rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleSend}
-                    className="flex-1 bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors"
+                    className="flex-1 bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold py-2.5 min-h-[40px] rounded-lg transition-colors"
                   >
                     Confirm & Send
                   </button>
@@ -712,8 +714,8 @@ function SendingPageContent() {
 
           {/* Success Modal */}
           {showSuccessModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-xl p-6 max-w-md w-full text-center">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
+              <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 max-h-[90dvh] overflow-y-auto text-center shadow-2xl">
                 <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <CheckIcon />
                 </div>
