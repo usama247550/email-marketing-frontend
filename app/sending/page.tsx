@@ -287,8 +287,8 @@ function SendingPageContent() {
                 disabled={!canSend || sending}
                 className={`w-full sm:w-auto px-6 py-2.5 min-h-[40px] text-sm font-semibold rounded-lg transition-colors text-center ${
                   canSend && !sending
-                    ? 'bg-gray-900 hover:bg-gray-800 text-white'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    ? 'bg-accent hover:bg-accent-hover text-white shadow-sm shadow-accent/30'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
               >
                 {sending ? 'Sending...' : 'Send Now'}
