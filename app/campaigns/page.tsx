@@ -69,9 +69,12 @@ export default function CampaignsPage() {
       
       // Convert API campaigns to frontend format
       const formattedCampaigns: Campaign[] = apiCampaigns.map((campaign: ApiCampaign) => {
-        const projectName = typeof campaign.projectId === 'object' ? 
-          campaign.projectId.name : 
-          projects.find(p => p._id === campaign.projectId)?.name || 'Unknown Project';
+        // Guard: null is typeof 'object', so check for null explicitly first
+        const projectName = campaign.projectId != null && typeof campaign.projectId === 'object'
+          ? campaign.projectId.name
+          : campaign.projectId
+            ? projects.find(p => p._id === campaign.projectId)?.name || 'Unknown Project'
+            : 'Deleted project';
         
         const openRate = campaign.sentCount > 0 ? (campaign.openedCount / campaign.sentCount) * 100 : 0;
         const unsubscribeRate = 0; // We don't have unsubscribe data yet
@@ -79,7 +82,9 @@ export default function CampaignsPage() {
         return {
           id: campaign._id,
           name: campaign.name,
-          projectId: typeof campaign.projectId === 'object' ? campaign.projectId._id : campaign.projectId,
+          projectId: campaign.projectId != null && typeof campaign.projectId === 'object'
+            ? campaign.projectId._id
+            : (typeof campaign.projectId === 'string' ? campaign.projectId : ''),
           projectName,
           sentDate: campaign.createdAt, // Use createdAt as sent date
           recipients: campaign.sentCount,

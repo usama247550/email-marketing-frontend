@@ -341,6 +341,10 @@ export default function LeadsPage() {
                   {projects.map((p) => (
                     <option key={p._id} value={p._id}>{p.name}</option>
                   ))}
+                  {/* Show "Deleted project" option only when at least one batch has a null projectId */}
+                  {batches.some((b) => b.projectId == null) && (
+                    <option value="__deleted__" disabled>— Deleted project —</option>
+                  )}
                 </select>
                 <button
                   onClick={() => setShowImportModal(true)}
@@ -392,10 +396,10 @@ export default function LeadsPage() {
                             <h3 className="text-sm font-semibold text-gray-900 truncate" title={batch.name}>
                               {batch.name}
                             </h3>
-                            <p className="text-xs text-gray-500 mt-0.5 truncate" title={typeof batch.projectId === 'object' ? batch.projectId.name : 'No Project'}>
-                              {batch.projectId ? 
-                                (typeof batch.projectId === 'object' ? batch.projectId.name : 'Unknown Project') 
-                                : 'No Project'
+                            <p className="text-xs text-gray-500 mt-0.5 truncate" title={batch.projectId != null && typeof batch.projectId === 'object' ? batch.projectId.name : (batch.projectId ? 'Unknown Project' : 'Deleted project')}>
+                              {batch.projectId != null
+                                ? (typeof batch.projectId === 'object' ? batch.projectId.name : 'Unknown Project')
+                                : <span className="text-red-400 italic">Deleted project</span>
                               }
                             </p>
                           </div>
@@ -471,10 +475,10 @@ export default function LeadsPage() {
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-500 truncate max-w-xs" title={typeof batch.projectId === 'object' ? batch.projectId.name : 'No Project'}>
-                                {batch.projectId ? 
-                                  (typeof batch.projectId === 'object' ? batch.projectId.name : 'Unknown Project') 
-                                  : 'No Project'
+                              <div className="text-sm text-gray-500 truncate max-w-xs" title={batch.projectId != null && typeof batch.projectId === 'object' ? batch.projectId.name : (batch.projectId ? 'Unknown Project' : 'Deleted project')}>
+                                {batch.projectId != null
+                                  ? (typeof batch.projectId === 'object' ? batch.projectId.name : 'Unknown Project')
+                                  : <span className="text-red-400 italic">Deleted project</span>
                                 }
                               </div>
                             </td>
