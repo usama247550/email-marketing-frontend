@@ -635,6 +635,13 @@ export interface NicheBreakdown {
   exhausted?:   boolean;
 }
 
+/** Per-niche resolved search terms returned in the summary */
+export interface SearchTermInfo {
+  niche:  string;    // original niche as the user typed it
+  terms:  string[];  // local-language TomTom search words
+  source: 'builtin' | 'cache' | 'ai' | 'fallback';
+}
+
 /** Shape returned by GET /status/:jobId while running and when done for multi_niche jobs */
 export interface MultiNicheJobStatus {
   type:        'multi_niche';
@@ -674,6 +681,8 @@ export interface MultiNicheSearchResult {
   totalElapsedSec:    number;
   fetchErrorCounts?:  Record<string, number>;
   perNicheBreakdown:  NicheBreakdown[];
+  /** Resolved search terms per niche (translation info). Added in v2. */
+  searchTerms?:       SearchTermInfo[];
 }
 
 /**

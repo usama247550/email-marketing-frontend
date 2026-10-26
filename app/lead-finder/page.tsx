@@ -16,6 +16,7 @@ import {
   type MultiNicheSearchResult,
   type MultiNicheJobProgress,
   type MultiNicheRoundStats,
+  type SearchTermInfo,
   type SmartSearchLead,
   type RejectedLead,
   type SmartSearchParsedParams,
@@ -724,6 +725,9 @@ export default function LeadFinderPage() {
                   </div>
 
                   <p className="mt-1.5 text-xs text-gray-400">
+                    You can type niches in English. The tool searches in the local language of the country.
+                  </p>
+                  <p className="mt-1.5 text-xs text-gray-400">
                     Press{' '}
                     <kbd className="px-1 py-0.5 bg-gray-100 rounded text-gray-500 font-mono text-[10px]">Enter</kbd>
                     {' '}to add,{' '}
@@ -880,7 +884,9 @@ export default function LeadFinderPage() {
                         </svg>
                         <p className="text-xs text-amber-800">
                           {{
+                            'call_cap':              `TomTom call cap reached. Got ${multiResult.totalFound} of ${multiForm.totalLeads} requested.`,
                             'rate_limit':            `TomTom API quota reached. Got ${multiResult.totalFound} of ${multiForm.totalLeads} requested.`,
+                            'all_terms_empty':       `None of the translated search terms returned results. Try different niches. Saved ${multiResult.totalFound} of ${multiForm.totalLeads}.`,
                             'cancelled':             `Stopped early at your request. Saved ${multiResult.totalFound} of ${multiForm.totalLeads}.`,
                             'time_limit':            `6-minute time limit reached. Saved ${multiResult.totalFound} of ${multiForm.totalLeads}.`,
                             'no_new_leads':          `Last round found no new leads — search stopped early. Saved ${multiResult.totalFound} of ${multiForm.totalLeads}.`,
@@ -889,6 +895,23 @@ export default function LeadFinderPage() {
                             '3_rounds_done':         `Completed 3 rounds. Saved ${multiResult.totalFound} of ${multiForm.totalLeads}.`,
                           }[multiResult.stopReason] ?? `Stopped: ${multiResult.stopReason}. Saved ${multiResult.totalFound} of ${multiForm.totalLeads}.`}
                         </p>
+                      </div>
+                    )}
+
+                    {/* Searched-as terms (translation info) */}
+                    {multiResult.searchTerms && multiResult.searchTerms.length > 0 && (
+                      <div className="ml-6 space-y-1">
+                        {multiResult.searchTerms.map((st: SearchTermInfo) => (
+                          <div key={st.niche} className="flex items-start gap-1.5 text-xs text-green-700">
+                            <span className="font-medium shrink-0">Searched&nbsp;as:</span>
+                            <span className="text-green-600">
+                              &ldquo;{st.niche}&rdquo; &rarr; {st.terms.map((t, i) => (
+                                <span key={i}>{i > 0 ? ', ' : ''}<span className="font-semibold">{t}</span></span>
+                              ))}
+                              <span className="text-green-500 ml-1">({st.source})</span>
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     )}
 
@@ -942,7 +965,7 @@ export default function LeadFinderPage() {
                     <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
                   </svg>
                   <p className="text-xs text-blue-700 leading-relaxed">
-                    We&apos;ll search each niche separately via TomTom, scrape websites for emails, and save everything to your leads list.
+                    We&apos;ll automatically translate your niches to the local language, search TomTom, scrape websites for emails, and save everything to your leads list. You can type niches in English — we handle the rest.
                   </p>
                 </div>
               </div>
