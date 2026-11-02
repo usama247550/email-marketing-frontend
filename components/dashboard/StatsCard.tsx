@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface StatsCardProps {
   title: string;
@@ -10,6 +10,41 @@ interface StatsCardProps {
 function formatNumber(n: number | string): string {
   if (typeof n === 'string') return n;
   return n.toLocaleString('en-US');
+}
+
+// Animated number counter hook
+function useCountAnimation(target: number | string, duration: number = 800): number {
+  const [count, setCount] = useState<number>(0);
+  
+  useEffect(() => {
+    if (typeof target === 'string') return;
+    
+    const targetNum = Number(target);
+    if (isNaN(targetNum)) return;
+    
+    let startTime: number | null = null;
+    let animationId: number;
+    
+    const animate = (currentTime: number) => {
+      if (startTime === null) startTime = currentTime;
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Start from 1, animate to target
+      const currentCount = Math.floor(1 + (targetNum - 1) * progress);
+      setCount(currentCount);
+      
+      if (progress < 1) {
+        animationId = requestAnimationFrame(animate);
+      }
+    };
+    
+    animationId = requestAnimationFrame(animate);
+    
+    return () => cancelAnimationFrame(animationId);
+  }, [target, duration]);
+  
+  return count;
 }
 
 const STAT_ICONS: Record<string, React.ReactNode> = {
@@ -49,6 +84,7 @@ const STAT_ICONS: Record<string, React.ReactNode> = {
 
 export default function StatsCard({ title, value, change, loading = false }: StatsCardProps) {
   const positive = change >= 0;
+  const animatedCount = useCountAnimation(value, 800);
 
   return (
     <div className="bg-[#111827] rounded-2xl border border-[#1E293B] shadow-sm px-5 py-4 flex flex-col justify-between gap-3 hover:border-[#2E3C54] hover:shadow-md transition-all duration-200">
@@ -71,7 +107,7 @@ export default function StatsCard({ title, value, change, loading = false }: Sta
       ) : (
         <div className="space-y-2">
           <p className="text-3xl font-bold text-white tracking-tight leading-none">
-            {formatNumber(value)}
+            {formatNumber(typeof value === 'string' ? value : animatedCount)}
           </p>
           <div className="flex items-center gap-1.5 text-xs">
             <span className={`flex items-center font-semibold gap-0.5 ${positive ? 'text-emerald-400' : 'text-rose-400'}`}>
