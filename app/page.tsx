@@ -124,7 +124,7 @@ export default function DashboardPage() {
     repliesChange: 0,
   };
 
-  const statCards = [
+  const statCards: { title: string; value: number; change: number; showChange?: boolean }[] = [
     { 
       title: 'Total Leads', 
       value: stats.totalLeads, 
@@ -151,6 +151,7 @@ export default function DashboardPage() {
       change: stats.emailsSent > 0
         ? Math.round(((stats.unsubscribed ?? 0) / stats.emailsSent) * 100)
         : 0,
+      showChange: false,
     },
   ];
 
