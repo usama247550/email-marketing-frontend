@@ -77,7 +77,8 @@ export default function CampaignsPage() {
             : 'Deleted project';
         
         const openRate = campaign.sentCount > 0 ? (campaign.openedCount / campaign.sentCount) * 100 : 0;
-        const unsubscribeRate = 0; // We don't have unsubscribe data yet
+        const unsubscribed = campaign.unsubscribedCount || 0;
+        const unsubscribeRate = campaign.sentCount > 0 ? (unsubscribed / campaign.sentCount) * 100 : 0;
         
         return {
           id: campaign._id,
@@ -90,7 +91,7 @@ export default function CampaignsPage() {
           recipients: campaign.sentCount,
           opens: campaign.openedCount,
           openRate,
-          unsubscribed: 0, // We don't have unsubscribe data yet
+          unsubscribed,
           unsubscribeRate
         };
       });

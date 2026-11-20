@@ -11,7 +11,7 @@ export interface ApiStats {
   emailsFound: number;
   emailsSent: number;
   emailsOpened: number;
-  replies: number;
+  unsubscribed: number;
 }
 
 export type CampaignStatus = 'Running' | 'Completed' | 'Draft';
@@ -23,6 +23,7 @@ export interface ApiCampaign {
   leadsCount: number;
   sentCount: number;
   openedCount: number;
+  unsubscribedCount?: number;
   repliedCount: number;
   failedCount: number;
   status: CampaignStatus;

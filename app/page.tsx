@@ -31,7 +31,7 @@ const EMPTY_STATS: ApiStats = {
   emailsFound: 0,
   emailsSent: 0,
   emailsOpened: 0,
-  replies: 0,
+  unsubscribed: 0,
 };
 
 export default function DashboardPage() {
@@ -146,9 +146,11 @@ export default function DashboardPage() {
       change: changes.emailsOpenedChange,
     },
     { 
-      title: 'Replies', 
-      value: stats.replies, 
-      change: changes.repliesChange,
+      title: 'Unsubscribed', 
+      value: stats.unsubscribed ?? 0, 
+      change: stats.emailsSent > 0
+        ? Math.round(((stats.unsubscribed ?? 0) / stats.emailsSent) * 100)
+        : 0,
     },
   ];
 
@@ -207,6 +209,7 @@ export default function DashboardPage() {
               title={card.title}
               value={card.value}
               change={card.change}
+              showChange={card.showChange}
               loading={statsLoading}
             />
           ))}

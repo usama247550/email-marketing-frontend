@@ -27,6 +27,7 @@ export default function SettingsPage() {
     apiKey: ''
   });
   const [apiAccountSaving, setApiAccountSaving] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
   const [showApiAccountDeleteConfirm, setShowApiAccountDeleteConfirm] = useState<string | null>(null);
   
   // Single form state
@@ -282,6 +283,7 @@ export default function SettingsPage() {
       provider: account.provider,
       apiKey: account.apiKey,
     });
+    setShowApiKey(false);
     setShowApiAccountModal(true);
   };
 
@@ -306,6 +308,7 @@ export default function SettingsPage() {
       provider: 'brevo',
       apiKey: ''
     });
+    setShowApiKey(false);
   };
 
   const maskApiKey = (apiKey: string) => {
@@ -615,7 +618,7 @@ export default function SettingsPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Email API Accounts</h3>
               <button
-                onClick={() => setShowApiAccountModal(true)}
+                onClick={() => { setShowApiKey(false); setShowApiAccountModal(true); }}
                 className="w-full sm:w-auto bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-4 py-2 min-h-[40px] rounded-lg transition-colors flex items-center justify-center gap-2"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -726,14 +729,35 @@ export default function SettingsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       API Key <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="password"
-                      value={apiAccountForm.apiKey}
-                      onChange={(e) => setApiAccountForm({...apiAccountForm, apiKey: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
-                      placeholder="xkeysib-..."
-                      disabled={apiAccountSaving}
-                    />
+                    <div className="relative">
+                      <input
+                        type={showApiKey ? 'text' : 'password'}
+                        value={apiAccountForm.apiKey}
+                        onChange={(e) => setApiAccountForm({...apiAccountForm, apiKey: e.target.value})}
+                        className="w-full px-3 py-2 pr-10 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
+                        placeholder="xkeysib-..."
+                        disabled={apiAccountSaving}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowApiKey((visible) => !visible)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+                      >
+                        {showApiKey ? (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                            <line x1="1" y1="1" x2="23" y2="23"/>
+                          </svg>
+                        ) : (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                          </svg>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3 mt-6 sticky bottom-0 bg-white pt-2">

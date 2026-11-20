@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 interface StatsCardProps {
   title: string;
   value: number | string;
-  change: number;
+  change?: number;
+  showChange?: boolean;
   loading?: boolean;
 }
 
@@ -74,15 +75,17 @@ const STAT_ICONS: Record<string, React.ReactNode> = {
       <circle cx="12" cy="12" r="3" />
     </svg>
   ),
-  'Replies': (
+  'Unsubscribed': (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="9 17 4 12 9 7" />
-      <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+      <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="8.5" cy="7" r="4" />
+      <line x1="18" y1="8" x2="23" y2="13" />
+      <line x1="23" y1="8" x2="18" y2="13" />
     </svg>
   ),
 };
 
-export default function StatsCard({ title, value, change, loading = false }: StatsCardProps) {
+export default function StatsCard({ title, value, change = 0, showChange = true, loading = false }: StatsCardProps) {
   const positive = change >= 0;
   const animatedCount = useCountAnimation(value, 800);
 
@@ -109,19 +112,21 @@ export default function StatsCard({ title, value, change, loading = false }: Sta
           <p className="text-3xl font-bold text-white tracking-tight leading-none">
             {formatNumber(typeof value === 'string' ? value : animatedCount)}
           </p>
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className={`flex items-center font-semibold gap-0.5 ${positive ? 'text-emerald-400' : 'text-rose-400'}`}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                {positive ? (
-                  <polyline points="18 15 12 9 6 15" />
-                ) : (
-                  <polyline points="6 9 12 15 18 9" />
-                )}
-              </svg>
-              <span>{positive ? '+' : ''}{change}%</span>
-            </span>
-            <span className="text-[#64748B]">from last run</span>
-          </div>
+          {showChange && (
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className={`flex items-center font-semibold gap-0.5 ${positive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  {positive ? (
+                    <polyline points="18 15 12 9 6 15" />
+                  ) : (
+                    <polyline points="6 9 12 15 18 9" />
+                  )}
+                </svg>
+                <span>{positive ? '+' : ''}{change}%</span>
+              </span>
+              <span className="text-[#64748B]">from last run</span>
+            </div>
+          )}
         </div>
       )}
     </div>
