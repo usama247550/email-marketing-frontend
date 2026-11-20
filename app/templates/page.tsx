@@ -22,6 +22,7 @@ const LEAD_VARIABLES: Variable[] = [
   { id: 'website', tag: '{{website}}',     label: 'Website' },
   { id: 'email',   tag: '{{email}}',       label: 'Email' },
   { id: 'sender',  tag: '{{senderName}}',  label: 'Your name' },
+  { id: 'issue',   tag: '{{websiteIssue}}', label: 'Website issue' },
 ];
 
 // Typed names that map to a real tag. Anything else is rejected so Brevo tags cannot be saved.
@@ -35,6 +36,7 @@ const MANUAL_TAG_BY_KEY: Record<string, Variable> = {
   yourname:    { id: 'sender',  tag: '{{senderName}}',  label: 'Your name' },
   firstname:   { id: 'first',   tag: '{{firstName}}',   label: 'First name' },
   name:        { id: 'first',   tag: '{{firstName}}',   label: 'First name' },
+  websiteissue:{ id: 'issue',   tag: '{{websiteIssue}}', label: 'Website issue' },
 };
 
 // ─── Small shared components ──────────────────────────────────────────────────
@@ -496,7 +498,7 @@ export default function TemplatesPage() {
     const key = newVarName.trim().replace(/[{}]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const match = MANUAL_TAG_BY_KEY[key];
     if (!match) {
-      setVarHint('Use a lead field: company, city, website, email, firstName, or senderName.');
+      setVarHint('Use a lead field: company, city, website, email, firstName, senderName, or websiteIssue.');
       return;
     }
     setVarHint(null);
@@ -794,6 +796,7 @@ export default function TemplatesPage() {
               <h2 className="text-sm font-semibold text-gray-900">Variables</h2>
               <p className="text-xs text-gray-400 -mt-2">
                 Click the subject or the body first, then click a tag. It is added in the correct format.
+                Website issue is filled when the lead finder saves the lead.
               </p>
 
               <div className="flex flex-col gap-1.5">

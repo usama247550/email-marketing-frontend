@@ -689,7 +689,7 @@ export default function LeadFinderPage() {
                   />
                   {allCities && (
                     <p className="mt-1 text-xs text-amber-600">
-                      ⚠ Whole-country searches may return more varied results and take a bit longer.
+                      Germany and the United States search major cities one by one. Other countries search by the country name.
                     </p>
                   )}
                 </div>
@@ -725,7 +725,7 @@ export default function LeadFinderPage() {
                   </div>
 
                   <p className="mt-1.5 text-xs text-gray-400">
-                    You can type niches in English. The tool searches in the local language of the country.
+                    You can type niches in English. Germany is searched in German. The United States stays in English.
                   </p>
                   <p className="mt-1.5 text-xs text-gray-400">
                     Press{' '}
@@ -965,7 +965,7 @@ export default function LeadFinderPage() {
                     <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
                   </svg>
                   <p className="text-xs text-blue-700 leading-relaxed">
-                    We&apos;ll automatically translate your niches to the local language, search TomTom, scrape websites for emails, and save everything to your leads list. You can type niches in English — we handle the rest.
+                    We&apos;ll search TomTom, check each website for an email and a simple website issue, and save both on the lead. Germany is searched in German. The United States stays in English.
                   </p>
                 </div>
               </div>
