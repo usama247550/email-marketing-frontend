@@ -94,6 +94,13 @@ function formatDate(dateStr: string): string {
 
 function formatLastRunSummary(automation: ApiAutomation): string {
   const sentCount = automation.lastRunSentCount ?? 0;
+  if (
+    sentCount === 0 &&
+    automation.lastRunFinderMessage &&
+    automation.lastRunFinderMessage.includes('not a variable in this tool')
+  ) {
+    return automation.lastRunFinderMessage;
+  }
   const sentText = `Sent ${sentCount}`;
 
   if (automation.lastRunFinderStatus === 'ok') {

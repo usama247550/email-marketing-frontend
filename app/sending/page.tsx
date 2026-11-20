@@ -703,7 +703,7 @@ function SendingPageContent() {
                   </button>
                   <button
                     onClick={handleSend}
-                    className="flex-1 bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold py-2.5 min-h-[40px] rounded-lg transition-colors"
+                    className="flex-1 bg-accent hover:bg-accent-hover text-white text-sm font-semibold py-2.5 min-h-[40px] rounded-lg transition-colors shadow-sm shadow-accent/30"
                   >
                     Confirm & Send
                   </button>

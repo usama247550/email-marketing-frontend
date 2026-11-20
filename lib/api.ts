@@ -251,9 +251,10 @@ export async function createTemplate(data: Partial<Template>): Promise<Template>
       },
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error(`Failed to create template: ${res.status}`);
-    const json = await res.json();
-    if (!json.success) throw new Error(json.message || 'Failed to create template');
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.success) {
+      throw new Error(json.message || `Failed to create template: ${res.status}`);
+    }
     return json.data;
   } catch (error) {
     console.error('Error creating template:', error);
@@ -270,9 +271,10 @@ export async function updateTemplate(id: string, data: Partial<Template>): Promi
       },
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error(`Failed to update template: ${res.status}`);
-    const json = await res.json();
-    if (!json.success) throw new Error(json.message || 'Failed to update template');
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.success) {
+      throw new Error(json.message || `Failed to update template: ${res.status}`);
+    }
     return json.data;
   } catch (error) {
     console.error('Error updating template:', error);

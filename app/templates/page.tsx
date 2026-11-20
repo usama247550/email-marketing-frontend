@@ -14,14 +14,28 @@ interface Variable {
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
-const INITIAL_VARIABLES: Variable[] = [
-  { id: 'v1', tag: '{{companyName}}', label: 'Company Name' },
-  { id: 'v2', tag: '{{firstName}}',   label: 'First Name'   },
-  { id: 'v3', tag: '{{city}}',        label: 'City'         },
-  { id: 'v4', tag: '{{website}}',     label: 'Website'      },
-  { id: 'v5', tag: '{{email}}',       label: 'Email'        },
-  { id: 'v6', tag: '{{senderName}}',  label: 'Your Name'    },
+// Same fields as the Leads table, written in the tag format this tool fills.
+// Status and Actions are list controls, not email text, so they are not here.
+const LEAD_VARIABLES: Variable[] = [
+  { id: 'company', tag: '{{companyName}}', label: 'Company' },
+  { id: 'city',    tag: '{{city}}',        label: 'City' },
+  { id: 'website', tag: '{{website}}',     label: 'Website' },
+  { id: 'email',   tag: '{{email}}',       label: 'Email' },
+  { id: 'sender',  tag: '{{senderName}}',  label: 'Your name' },
 ];
+
+// Typed names that map to a real tag. Anything else is rejected so Brevo tags cannot be saved.
+const MANUAL_TAG_BY_KEY: Record<string, Variable> = {
+  company:     { id: 'company', tag: '{{companyName}}', label: 'Company' },
+  companyname: { id: 'company', tag: '{{companyName}}', label: 'Company' },
+  city:        { id: 'city',    tag: '{{city}}',        label: 'City' },
+  website:     { id: 'website', tag: '{{website}}',     label: 'Website' },
+  email:       { id: 'email',   tag: '{{email}}',       label: 'Email' },
+  sendername:  { id: 'sender',  tag: '{{senderName}}',  label: 'Your name' },
+  yourname:    { id: 'sender',  tag: '{{senderName}}',  label: 'Your name' },
+  firstname:   { id: 'first',   tag: '{{firstName}}',   label: 'First name' },
+  name:        { id: 'first',   tag: '{{firstName}}',   label: 'First name' },
+};
 
 // ─── Small shared components ──────────────────────────────────────────────────
 
@@ -101,9 +115,10 @@ interface RichEditorProps {
   value: string;
   onChange: (html: string) => void;
   editorRef: React.RefObject<HTMLDivElement>;
+  onFocus?: () => void;
 }
 
-function RichEditor({ value, onChange, editorRef }: RichEditorProps) {
+function RichEditor({ value, onChange, editorRef, onFocus }: RichEditorProps) {
   const exec = (command: string, val?: string) => {
     document.execCommand(command, false, val);
     if (editorRef.current) onChange(editorRef.current.innerHTML);
@@ -176,6 +191,7 @@ function RichEditor({ value, onChange, editorRef }: RichEditorProps) {
         ref={editorRef}
         contentEditable
         suppressContentEditableWarning
+        onFocus={onFocus}
         onInput={() => {
           if (editorRef.current) onChange(editorRef.current.innerHTML);
         }}
@@ -311,11 +327,13 @@ export default function TemplatesPage() {
   const [formSubject, setFormSubject] = useState('');
   const [formBody,    setFormBody]    = useState('');
   const editorRef = useRef<HTMLDivElement>(null);
+  const subjectRef = useRef<HTMLInputElement>(null);
+  const insertTargetRef = useRef<'subject' | 'body'>('body');
+  const [extraVariables, setExtraVariables] = useState<Variable[]>([]);
+  const [showNewVarInput, setShowNewVarInput] = useState(false);
+  const [newVarName, setNewVarName] = useState('');
+  const [varHint, setVarHint] = useState<string | null>(null);
 
-  // ── variables state
-  const [variables,        setVariables]        = useState<Variable[]>(INITIAL_VARIABLES);
-  const [showNewVarInput,  setShowNewVarInput]  = useState(false);
-  const [newVarName,       setNewVarName]       = useState('');
 
   // ── preview state
   const [showPreview, setShowPreview] = useState(false);
@@ -345,6 +363,7 @@ export default function TemplatesPage() {
     new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
   const openComposer = useCallback((template: Template | null) => {
+    setError(null);
     setEditingTemplate(template);
     const name    = template?.name    ?? '';
     const subject = template?.subject ?? '';
@@ -352,29 +371,15 @@ export default function TemplatesPage() {
     setFormName(name);
     setFormSubject(subject);
     setFormBody(body);
+    setExtraVariables([]);
+    setShowNewVarInput(false);
+    setNewVarName('');
+    setVarHint(null);
     // Reset editor seed flag so the new body is injected on mount
     if (editorRef.current) {
       editorRef.current.innerHTML = body;
     }
     setView('composer');
-    
-    // Update variables from template if editing
-    if (template?.variables) {
-      const templateVars = template.variables.map((varName, index) => ({
-        id: `v${index + 10}`,
-        tag: `{{${varName}}}`,
-        label: varName.charAt(0).toUpperCase() + varName.slice(1).replace(/([A-Z])/g, ' $1')
-      }));
-      
-      // Merge with initial variables, avoiding duplicates
-      const allVars = [...INITIAL_VARIABLES];
-      templateVars.forEach(tVar => {
-        if (!allVars.some(v => v.tag === tVar.tag)) {
-          allVars.push(tVar);
-        }
-      });
-      setVariables(allVars);
-    }
   }, []);
 
   const handleSave = async () => {
@@ -410,7 +415,8 @@ export default function TemplatesPage() {
       setView('list');
     } catch (err) {
       console.error('Error saving template:', err);
-      setError('Failed to save template. Please try again.');
+      const message = err instanceof Error ? err.message : 'Failed to save template. Please try again.';
+      setError(message);
     } finally {
       setSaving(false);
     }
@@ -435,47 +441,71 @@ export default function TemplatesPage() {
 
   // ── variable insertion ─────────────────────────────────────────────────────
 
+  const rememberInsertTarget = () => {
+    const active = document.activeElement;
+    if (subjectRef.current && active === subjectRef.current) {
+      insertTargetRef.current = 'subject';
+      return;
+    }
+    if (editorRef.current && (active === editorRef.current || editorRef.current.contains(active))) {
+      insertTargetRef.current = 'body';
+    }
+  };
+
   const insertVariable = (tag: string) => {
+    rememberInsertTarget();
+    if (insertTargetRef.current === 'subject' && subjectRef.current) {
+      const input = subjectRef.current;
+      const start = input.selectionStart ?? formSubject.length;
+      const end = input.selectionEnd ?? start;
+      const next = formSubject.slice(0, start) + tag + formSubject.slice(end);
+      const caret = start + tag.length;
+      setFormSubject(next);
+      requestAnimationFrame(() => {
+        input.focus();
+        input.setSelectionRange(caret, caret);
+      });
+      return;
+    }
+
     const editor = editorRef.current;
     if (!editor) return;
     editor.focus();
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) {
-      const range = sel.getRangeAt(0);
-      // Check the selected range is inside the editor
-      if (editor.contains(range.commonAncestorContainer)) {
-        range.deleteContents();
-        range.insertNode(document.createTextNode(tag));
-        range.collapse(false);
-        sel.removeAllRanges();
-        sel.addRange(range);
-      } else {
-        // Cursor outside editor — append to end
-        editor.innerHTML += tag;
-      }
+    const selection = window.getSelection();
+    const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+    const insideEditor = !!range && editor.contains(range.commonAncestorContainer);
+    const insertRange = document.createRange();
+    if (insideEditor && range) {
+      insertRange.setStart(range.startContainer, range.startOffset);
+      insertRange.setEnd(range.endContainer, range.endOffset);
+      insertRange.deleteContents();
     } else {
-      editor.innerHTML += tag;
+      insertRange.selectNodeContents(editor);
+      insertRange.collapse(false);
     }
+    const node = document.createTextNode(tag);
+    insertRange.insertNode(node);
+    insertRange.setStartAfter(node);
+    insertRange.collapse(true);
+    selection?.removeAllRanges();
+    selection?.addRange(insertRange);
     setFormBody(editor.innerHTML);
   };
 
   const handleAddVariable = () => {
-    const raw = newVarName.trim();
-    if (!raw) return;
-    // Sanitise: letters + digits only, camelCase-ish
-    const sanitised = raw.replace(/[^a-zA-Z0-9]/g, '');
-    if (!sanitised) return;
-    const tag = `{{${sanitised}}}`;
-    // Avoid duplicates
-    if (variables.some(v => v.tag === tag)) {
-      setNewVarName('');
-      setShowNewVarInput(false);
+    const key = newVarName.trim().replace(/[{}]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const match = MANUAL_TAG_BY_KEY[key];
+    if (!match) {
+      setVarHint('Use a lead field: company, city, website, email, firstName, or senderName.');
       return;
     }
-    setVariables(prev => [
-      ...prev,
-      { id: Date.now().toString(), tag, label: raw },
-    ]);
+    setVarHint(null);
+    const alreadyListed = LEAD_VARIABLES.some((v) => v.tag === match.tag)
+      || extraVariables.some((v) => v.tag === match.tag);
+    if (!alreadyListed) {
+      setExtraVariables((prev) => [...prev, match]);
+    }
+    insertVariable(match.tag);
     setNewVarName('');
     setShowNewVarInput(false);
   };
@@ -676,6 +706,12 @@ export default function TemplatesPage() {
             </div>
           </div>
 
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-sm text-red-800">{error}</p>
+            </div>
+          )}
+
           {/* Two-column layout */}
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-5 items-start">
             {/* ── Left: Template Details card ── */}
@@ -702,12 +738,17 @@ export default function TemplatesPage() {
                   Subject
                 </label>
                 <input
+                  ref={subjectRef}
                   type="text"
                   value={formSubject}
+                  onFocus={() => { insertTargetRef.current = 'subject'; }}
                   onChange={(e) => setFormSubject(e.target.value)}
                   placeholder="e.g. Website Anfrage für {{companyName}}"
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all"
                 />
+                <p className="text-xs text-gray-500 mt-1.5">
+                  Click the subject, then click a tag on the right. It is inserted where the cursor is.
+                </p>
               </div>
 
               {/* Body */}
@@ -719,6 +760,7 @@ export default function TemplatesPage() {
                   value={formBody}
                   onChange={setFormBody}
                   editorRef={editorRef}
+                  onFocus={() => { insertTargetRef.current = 'body'; }}
                 />
               </div>
 
@@ -751,52 +793,54 @@ export default function TemplatesPage() {
             <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-5 space-y-4">
               <h2 className="text-sm font-semibold text-gray-900">Variables</h2>
               <p className="text-xs text-gray-400 -mt-2">
-                Click a variable to insert it at your cursor position.
+                Click the subject or the body first, then click a tag. It is added in the correct format.
               </p>
 
-              {/* Variable pills */}
-              <div className="flex flex-wrap gap-1.5">
-                {variables.map((v) => (
+              <div className="flex flex-col gap-1.5">
+                {[...LEAD_VARIABLES, ...extraVariables].map((v) => (
                   <button
                     key={v.id}
                     type="button"
+                    onMouseDown={(e) => {
+                      rememberInsertTarget();
+                      e.preventDefault();
+                    }}
                     onClick={() => insertVariable(v.tag)}
-                    className="flex items-center justify-between px-3 py-2 min-h-[40px] rounded-lg border border-gray-200 hover:border-accent hover:bg-accent/5 transition-all group"
+                    className="flex items-center justify-between gap-3 px-3 py-2 min-h-[40px] rounded-lg border border-gray-200 hover:border-accent hover:bg-accent/5 transition-all text-left"
                   >
-                    <span className="text-xs font-mono font-medium text-accent group-hover:text-accent">
-                      {v.tag}
-                    </span>
-                    <span className="text-xs text-gray-400 group-hover:text-gray-600 transition-colors">
-                      {v.label}
-                    </span>
+                    <span className="text-sm text-gray-800">{v.label}</span>
+                    <span className="text-xs font-mono font-medium text-accent">{v.tag}</span>
                   </button>
                 ))}
               </div>
 
-              {/* Add new variable */}
               {showNewVarInput ? (
                 <div className="space-y-2">
                   <input
                     type="text"
                     value={newVarName}
-                    onChange={(e) => setNewVarName(e.target.value)}
+                    onChange={(e) => { setNewVarName(e.target.value); setVarHint(null); }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleAddVariable();
-                      if (e.key === 'Escape') { setShowNewVarInput(false); setNewVarName(''); }
+                      if (e.key === 'Escape') { setShowNewVarInput(false); setNewVarName(''); setVarHint(null); }
                     }}
-                    placeholder="e.g. phoneNumber"
+                    placeholder="e.g. firstName"
                     autoFocus
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all"
                   />
+                  {varHint && <p className="text-xs text-red-600">{varHint}</p>}
                   <div className="flex items-center gap-1.5">
                     <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={handleAddVariable}
                       className="flex-1 py-1.5 text-xs font-medium text-white bg-accent hover:bg-accent-hover rounded-lg transition-colors"
                     >
                       Add
                     </button>
                     <button
-                      onClick={() => { setShowNewVarInput(false); setNewVarName(''); }}
+                      type="button"
+                      onClick={() => { setShowNewVarInput(false); setNewVarName(''); setVarHint(null); }}
                       className="flex-1 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       Cancel
@@ -805,13 +849,18 @@ export default function TemplatesPage() {
                 </div>
               ) : (
                 <button
+                  type="button"
                   onClick={() => setShowNewVarInput(true)}
                   className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium text-gray-500 border border-dashed border-gray-300 rounded-lg hover:border-accent hover:text-accent transition-colors"
                 >
                   <IconPlus />
-                  Create New Variable
+                  Add keyword manually
                 </button>
               )}
+
+              <p className="text-xs text-gray-400">
+                Status and Actions are only on the leads list. They are not written inside the email.
+              </p>
             </div>
           </div>
         </div>
