@@ -184,14 +184,19 @@ function SendingPageContent() {
 
   // Replace variables in template for preview
   const replaceVariables = (text: string) => {
+    const websiteIssueFallback = 'your website could bring in more local customers';
+    const websiteIssueDeFallback = 'Ihre Website könnte Ihnen mehr Anfragen aus der Region bringen';
     return text
-      .replace(/\{\{companyName\}\}/g, 'Example Corp')
-      .replace(/\{\{company\}\}/g, 'Example Corp')
-      .replace(/\{\{firstName\}\}/g, 'John')
-      .replace(/\{\{name\}\}/g, 'John')
-      .replace(/\{\{city\}\}/g, 'Berlin')
-      .replace(/\{\{website\}\}/g, 'https://example.com')
-      .replace(/\{\{senderName\}\}/g, selectedProject?.senderName || selectedProject?.name || 'Your Name');
+      .replace(/\{\{companyName\}\}/gi, 'Example Corp')
+      .replace(/\{\{company\}\}/gi, 'Example Corp')
+      .replace(/\{\{firstName\}\}/gi, 'John')
+      .replace(/\{\{name\}\}/gi, 'John')
+      .replace(/\{\{city\}\}/gi, 'Berlin')
+      .replace(/\{\{website\}\}/gi, 'https://example.com')
+      .replace(/\{\{email\}\}/gi, 'owner@example.com')
+      .replace(/\{\{websiteIssue\}\}/gi, websiteIssueFallback)
+      .replace(/\{\{websiteIssueDe\}\}/gi, websiteIssueDeFallback)
+      .replace(/\{\{senderName\}\}/gi, selectedProject?.senderName || selectedProject?.name || 'Your Name');
   };
 
   // Handle batch selection

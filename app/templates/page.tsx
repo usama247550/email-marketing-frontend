@@ -2,6 +2,11 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Template, getTemplates, createTemplate, updateTemplate, deleteTemplate } from '@/lib/api';
+import {
+  ARSWIFT_STARTER_TEMPLATES,
+  ARSWIFT_TEMPLATE_TIPS,
+  type ArswiftStarterTemplate,
+} from '@/lib/arswiftStarterTemplates';
 import Topbar from '@/components/dashboard/Topbar';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -22,7 +27,8 @@ const LEAD_VARIABLES: Variable[] = [
   { id: 'website', tag: '{{website}}',     label: 'Website' },
   { id: 'email',   tag: '{{email}}',       label: 'Email' },
   { id: 'sender',  tag: '{{senderName}}',  label: 'Your name' },
-  { id: 'issue',   tag: '{{websiteIssue}}', label: 'Website issue' },
+  { id: 'issue',   tag: '{{websiteIssue}}', label: 'Website issue (EN)' },
+  { id: 'issuede', tag: '{{websiteIssueDe}}', label: 'Website issue (DE)' },
 ];
 
 // Typed names that map to a real tag. Anything else is rejected so Brevo tags cannot be saved.
@@ -36,7 +42,8 @@ const MANUAL_TAG_BY_KEY: Record<string, Variable> = {
   yourname:    { id: 'sender',  tag: '{{senderName}}',  label: 'Your name' },
   firstname:   { id: 'first',   tag: '{{firstName}}',   label: 'First name' },
   name:        { id: 'first',   tag: '{{firstName}}',   label: 'First name' },
-  websiteissue:{ id: 'issue',   tag: '{{websiteIssue}}', label: 'Website issue' },
+  websiteissue:   { id: 'issue',   tag: '{{websiteIssue}}', label: 'Website issue (EN)' },
+  websiteissuede: { id: 'issuede', tag: '{{websiteIssueDe}}', label: 'Website issue (DE)' },
 };
 
 // ─── Small shared components ──────────────────────────────────────────────────
@@ -384,6 +391,22 @@ export default function TemplatesPage() {
     setView('composer');
   }, []);
 
+  const openArswiftStarter = useCallback((starter: ArswiftStarterTemplate) => {
+    setError(null);
+    setEditingTemplate(null);
+    setFormName(starter.name);
+    setFormSubject(starter.subject);
+    setFormBody(starter.body);
+    setExtraVariables([]);
+    setShowNewVarInput(false);
+    setNewVarName('');
+    setVarHint(null);
+    if (editorRef.current) {
+      editorRef.current.innerHTML = starter.body;
+    }
+    setView('composer');
+  }, []);
+
   const handleSave = async () => {
     if (!formName.trim()) return;
 
@@ -498,7 +521,7 @@ export default function TemplatesPage() {
     const key = newVarName.trim().replace(/[{}]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const match = MANUAL_TAG_BY_KEY[key];
     if (!match) {
-      setVarHint('Use a lead field: company, city, website, email, firstName, senderName, or websiteIssue.');
+      setVarHint('Use: company, city, website, email, firstName, senderName, websiteIssue (EN), or websiteIssueDe (DE).');
       return;
     }
     setVarHint(null);
@@ -556,7 +579,9 @@ export default function TemplatesPage() {
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Email Templates</h1>
-              <p className="text-sm text-gray-400 mt-0.5">Create and manage your email templates.</p>
+              <p className="text-sm text-gray-400 mt-0.5">
+                Caravan = Caravan site visitors. ArSwift starters = website development clients (copy, edit, save).
+              </p>
             </div>
             <button
               onClick={() => openComposer(null)}
@@ -577,6 +602,49 @@ export default function TemplatesPage() {
               </div>
             </div>
           )}
+
+          <div className="bg-white rounded-xl border border-accent/20 p-4 md:p-5 space-y-4">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">ArSwift outreach starters</h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Opens a draft you can edit and save. Use on your ArSwift project, not Caravan.
+              </p>
+            </div>
+            <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {ARSWIFT_STARTER_TEMPLATES.map((starter) => (
+                <li
+                  key={starter.id}
+                  className="border border-gray-200 rounded-lg p-3 flex flex-col gap-2 bg-gray-50/50"
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded ${
+                        starter.market === 'US'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-amber-100 text-amber-900'
+                      }`}
+                    >
+                      {starter.market === 'US' ? 'USA' : 'Germany'}
+                    </span>
+                    <span className="text-sm font-medium text-gray-900">{starter.title}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 flex-1">{starter.subtitle}</p>
+                  <button
+                    type="button"
+                    onClick={() => openArswiftStarter(starter)}
+                    className="w-full text-sm font-medium text-accent hover:text-accent-hover border border-accent/30 hover:border-accent rounded-lg py-2 min-h-[40px] bg-white transition-colors"
+                  >
+                    Use this draft
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <ul className="text-xs text-gray-500 space-y-1 list-disc list-inside">
+              {ARSWIFT_TEMPLATE_TIPS.map((tip) => (
+                <li key={tip}>{tip}</li>
+              ))}
+            </ul>
+          </div>
 
           {/* Table card */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
