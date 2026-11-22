@@ -90,7 +90,7 @@ function SendingPageContent() {
       // Convert batches and calculate valid leads count for each
       const batchesWithValidCount: BatchWithLeads[] = data.batches.map((batch: Batch) => ({
         ...batch,
-        validLeadCount: batch.leadCount // For now, assume all leads are valid since we don't have detailed lead data
+        validLeadCount: batch.sendableLeadCount ?? batch.leadCount ?? 0,
       }));
       
       setBatches(batchesWithValidCount);
@@ -385,7 +385,7 @@ function SendingPageContent() {
                   <h3 className="text-sm font-semibold text-gray-900">Leads</h3>
                   {selectedBatches.length > 0 ? (
                     <p className="text-sm text-gray-600 mt-1">
-                      {selectedBatches.length} batches - {getTotalValidLeads()} valid leads
+                      {selectedBatches.length} batches — {getTotalValidLeads()} verified leads
                     </p>
                   ) : (
                     <p className="text-sm text-gray-500 mt-1">Select lead batches to send to</p>
@@ -584,7 +584,7 @@ function SendingPageContent() {
                               </div>
                             </div>
                             <div className="text-sm text-gray-500 mt-1">
-                              {formatDate(batch.createdAt)} • {batch.validLeadCount} valid leads of {batch.leadCount} total
+                              {formatDate(batch.createdAt)} • {batch.validLeadCount} verified leads
                             </div>
                           </div>
                         </label>

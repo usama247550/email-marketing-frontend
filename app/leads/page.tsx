@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Topbar from '@/components/dashboard/Topbar';
-import { getBatches, getBatchLeads, deleteBatch, importCsv, getProjects, type Batch, type Lead, type BatchesResponse, type LeadsResponse, type Project } from '@/lib/api';
+import { getBatches, getBatchLeads, deleteBatch, deleteLead, updateLead, importCsv, getProjects, type Batch, type Lead, type BatchesResponse, type LeadsResponse, type Project } from '@/lib/api';
 
 // Remove mock data - we'll use real API data now
 
@@ -43,6 +43,11 @@ export default function LeadsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [batchToDelete, setBatchToDelete] = useState<Batch | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [leadToEdit, setLeadToEdit] = useState<Lead | null>(null);
+  const [editForm, setEditForm] = useState({ company: '', city: '', website: '', email: '' });
+  const [savingLead, setSavingLead] = useState(false);
+  const [leadToDelete, setLeadToDelete] = useState<Lead | null>(null);
+  const [deletingLead, setDeletingLead] = useState(false);
 
   const BATCHES_PER_PAGE = 12;
   const LEADS_PER_PAGE = 15;
@@ -125,6 +130,61 @@ export default function LeadsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leadsPage, currentView, selectedBatch?._id, fetchLeadsData]); // selectedBatch excluded to prevent infinite loop
 
+  const openEditLead = (lead: Lead) => {
+    setLeadToEdit(lead);
+    setEditForm({
+      company: lead.company || '',
+      city: lead.city || '',
+      website: lead.website || '',
+      email: lead.email || '',
+    });
+  };
+
+  const closeEditLead = () => {
+    setLeadToEdit(null);
+    setEditForm({ company: '', city: '', website: '', email: '' });
+  };
+
+  const saveEditLead = async () => {
+    if (!leadToEdit || !selectedBatch) return;
+    try {
+      setSavingLead(true);
+      const result = await updateLead(leadToEdit._id, editForm);
+      closeEditLead();
+      if ((result as { removed?: boolean }).removed) {
+        alert(result.message);
+      }
+      await fetchLeadsData(selectedBatch._id);
+      await fetchBatchesData();
+      const fresh = await getBatchLeads(selectedBatch._id, leadsPage, LEADS_PER_PAGE);
+      setSelectedBatch((prev) =>
+        prev ? { ...prev, leadCount: fresh.batch.leadCount } : prev
+      );
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to save lead');
+    } finally {
+      setSavingLead(false);
+    }
+  };
+
+  const confirmDeleteLead = async () => {
+    if (!leadToDelete || !selectedBatch) return;
+    try {
+      setDeletingLead(true);
+      await deleteLead(leadToDelete._id);
+      setLeadToDelete(null);
+      await fetchLeadsData(selectedBatch._id);
+      await fetchBatchesData();
+      setSelectedBatch((prev) =>
+        prev ? { ...prev, leadCount: Math.max(0, (prev.leadCount || 1) - 1) } : prev
+      );
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to delete lead');
+    } finally {
+      setDeletingLead(false);
+    }
+  };
+
   const handleViewBatch = (batch: Batch) => {
     setSelectedBatch(batch);
     setCurrentView('batch-detail');
@@ -205,7 +265,11 @@ export default function LeadsPage() {
       await fetchBatchesData();
       
       // Show success message
-      alert(`CSV imported successfully! ${data.leadsImported} leads added (${data.validLeads} valid, ${data.invalidLeads} invalid).`);
+      const skipped = (data as { rowsSkipped?: number }).rowsSkipped;
+      alert(
+        `CSV imported: ${data.leadsImported} verified leads saved.` +
+        (skipped ? `\n${skipped} row(s) skipped (failed email check).` : '')
+      );
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Failed to import CSV file');
     } finally {
@@ -555,7 +619,11 @@ export default function LeadsPage() {
               <div className="min-w-0 flex-1">
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate" title={selectedBatch.name}>{selectedBatch.name}</h1>
                 <p className="text-sm text-gray-400 mt-0.5">
-                  {selectedBatch.leadCount} leads • {formatDate(selectedBatch.createdAt)}
+                  {selectedBatch.leadCount} leads
+                  {' • '}{formatDate(selectedBatch.createdAt)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Only verified emails are saved here. Bad rows are removed automatically.
                 </p>
               </div>
             </div>
@@ -598,13 +666,6 @@ export default function LeadsPage() {
                               <div className="text-xs text-gray-500 mt-0.5">{lead.city}</div>
                             )}
                           </div>
-                          <span className={`shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            lead.status === 'Valid'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {lead.status}
-                          </span>
                         </div>
                         <div className="text-xs space-y-1.5 text-gray-600">
                           {lead.email && (
@@ -619,6 +680,22 @@ export default function LeadsPage() {
                               </a>
                             </div>
                           )}
+                        </div>
+                        <div className="flex justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => openEditLead(lead)}
+                            className="text-xs font-medium text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px]"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setLeadToDelete(lead)}
+                            className="text-xs font-medium text-red-600 border border-red-200 rounded-lg px-3 py-1.5 min-h-[36px]"
+                          >
+                            Delete
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -640,9 +717,6 @@ export default function LeadsPage() {
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Email
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
                           </th>
                           <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Actions
@@ -670,24 +744,25 @@ export default function LeadsPage() {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 truncate max-w-[200px]" title={lead.email || '-'}>
                               {lead.email || '-'}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                lead.status === 'Valid'
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-red-100 text-red-800'
-                              }`}>
-                                {lead.status}
-                              </span>
-                            </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right">
                               <div className="flex items-center justify-end gap-2">
-                                <button className="text-gray-400 hover:text-gray-600 transition-colors p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg" aria-label="Edit lead">
+                                <button
+                                  type="button"
+                                  onClick={() => openEditLead(lead)}
+                                  className="text-gray-400 hover:text-gray-600 transition-colors p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg"
+                                  aria-label="Edit lead"
+                                >
                                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                                   </svg>
                                 </button>
-                                <button className="text-gray-400 hover:text-red-600 transition-colors p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg" aria-label="Delete lead">
+                                <button
+                                  type="button"
+                                  onClick={() => setLeadToDelete(lead)}
+                                  className="text-gray-400 hover:text-red-600 transition-colors p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg"
+                                  aria-label="Delete lead"
+                                >
                                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <polyline points="3 6 5 6 21 6" />
                                     <path d="m19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
@@ -714,6 +789,83 @@ export default function LeadsPage() {
           </>
         )}
       </div>
+
+      {/* Edit lead modal */}
+      {leadToEdit && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Edit lead</h2>
+            </div>
+            <div className="p-5 space-y-3">
+              {(['company', 'city', 'website', 'email'] as const).map((field) => (
+                <div key={field}>
+                  <label className="block text-xs font-medium text-gray-600 mb-1 capitalize">
+                    {field}
+                  </label>
+                  <input
+                    type={field === 'email' ? 'email' : 'text'}
+                    value={editForm[field]}
+                    onChange={(e) => setEditForm((f) => ({ ...f, [field]: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  />
+                </div>
+              ))}
+              <p className="text-xs text-gray-500">
+                After save, the email is checked again. If it fails, the row is removed from the list.
+              </p>
+            </div>
+            <div className="p-4 bg-gray-50 border-t flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={closeEditLead}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveEditLead}
+                disabled={savingLead || !editForm.email.trim()}
+                className="px-4 py-2 text-sm text-white bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50"
+              >
+                {savingLead ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete single lead */}
+      {leadToDelete && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div className="p-5">
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">Delete this lead?</h2>
+              <p className="text-sm text-gray-600 break-all">
+                <strong>{leadToDelete.company || 'Lead'}</strong> — {leadToDelete.email}
+              </p>
+            </div>
+            <div className="p-4 bg-gray-50 border-t flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setLeadToDelete(null)}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteLead}
+                disabled={deletingLead}
+                className="px-4 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50"
+              >
+                {deletingLead ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && batchToDelete && (

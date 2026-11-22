@@ -306,7 +306,9 @@ export interface Lead {
   city: string;
   website: string;
   email: string;
-  status: 'Valid' | 'Invalid';
+  status: 'Valid' | 'Invalid' | 'Unsubscribed';
+  emailVerified?: boolean;
+  emailVerifyNote?: string;
   createdAt: string;
 }
 
@@ -315,6 +317,7 @@ export interface Batch {
   name: string;
   source: 'CSV Import' | 'Lead Finder Agent';
   leadCount: number;
+  sendableLeadCount?: number;
   projectId?: { _id: string; name: string } | string;
   createdAt: string;
 }
@@ -378,6 +381,40 @@ export async function getBatchLeads(batchId: string, page: number = 1, limit: nu
     console.error('Error fetching batch leads:', error);
     throw error;
   }
+}
+
+export async function updateLead(
+  leadId: string,
+  data: Partial<Pick<Lead, 'company' | 'city' | 'website' | 'email'>>
+): Promise<{ message: string; lead: Lead }> {
+  const res = await fetch(`${API_BASE}/api/leads/${leadId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || `Failed to update lead: ${res.status}`);
+  return json;
+}
+
+export async function deleteLead(leadId: string): Promise<{ message: string; deletedLead: Lead }> {
+  const res = await fetch(`${API_BASE}/api/leads/${leadId}`, { method: 'DELETE' });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || `Failed to delete lead: ${res.status}`);
+  return json;
+}
+
+export async function verifyBatchEmails(batchId: string): Promise<{
+  message: string;
+  verified: number;
+  failed: number;
+  total: number;
+  sendableLeadCount: number;
+}> {
+  const res = await fetch(`${API_BASE}/api/batches/${batchId}/verify-emails`, { method: 'POST' });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || `Verify failed: ${res.status}`);
+  return json;
 }
 
 export async function deleteBatch(batchId: string): Promise<{ message: string; deletedBatch: Batch; deletedLeadsCount: number }> {
