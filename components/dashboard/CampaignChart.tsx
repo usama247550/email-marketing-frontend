@@ -9,8 +9,9 @@ import {
   YAxis,
   Tooltip,
 } from 'recharts';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { PerformanceDay } from '@/lib/api';
+import { useTheme } from '@/components/theme/ThemeProvider';
 
 interface CampaignChartProps {
   data: PerformanceDay[];
@@ -43,21 +44,29 @@ function useWindowWidth() {
   return width;
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+function ChartTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ dataKey: string; name: string; value: number; color: string }>;
+  label?: string;
+}) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-[#182234] border border-[#2E3C54] rounded-xl shadow-2xl px-4 py-3 text-sm">
-      <p className="font-semibold text-white mb-2">{formatShortDate(label)}</p>
-      {payload.map((entry: any) => (
+    <div className="theme-card border rounded-xl shadow-lg px-4 py-3 text-sm">
+      <p className="font-semibold theme-text-primary mb-2">{formatShortDate(label ?? '')}</p>
+      {payload.map((entry) => (
         <div key={entry.dataKey} className="flex items-center gap-2 mb-0.5">
           <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
-          <span className="text-[#94A3B8] capitalize">{entry.name}:</span>
-          <span className="font-semibold text-white">{entry.value}</span>
+          <span className="theme-text-secondary capitalize">{entry.name}:</span>
+          <span className="font-semibold theme-text-primary">{entry.value}</span>
         </div>
       ))}
     </div>
   );
-};
+}
 
 export default function CampaignChart({
   data,
@@ -67,22 +76,33 @@ export default function CampaignChart({
   error = null,
   onRetry,
 }: CampaignChartProps) {
+  const { theme } = useTheme();
+  const chartColors = useMemo(
+    () =>
+      theme === 'light'
+        ? { grid: '#E2E8F0', tick: '#64748B' }
+        : { grid: '#1E293B', tick: '#64748B' },
+    [theme]
+  );
+
   const allZeros = data.length > 0 && data.every((d) => d.sent === 0);
   const isEmpty = data.length === 0 || allZeros;
   const windowWidth = useWindowWidth();
   const chartHeight = windowWidth < 640 ? 160 : 220;
-  // On phones show fewer x-axis ticks to avoid overlap
-  const tickInterval = windowWidth < 640 ? Math.max(Math.ceil(data.length / 4) - 1, 1) : windowWidth < 768 ? Math.max(Math.ceil(data.length / 6) - 1, 0) : 0;
+  const tickInterval =
+    windowWidth < 640
+      ? Math.max(Math.ceil(data.length / 4) - 1, 1)
+      : windowWidth < 768
+        ? Math.max(Math.ceil(data.length / 6) - 1, 0)
+        : 0;
 
   return (
-    <div className="bg-[#111827] rounded-2xl border border-[#1E293B] shadow-sm p-4 md:p-5 h-full flex flex-col justify-between min-w-0">
-      {/* Header */}
+    <div className="theme-card rounded-2xl border p-4 md:p-5 h-full flex flex-col justify-between min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-2 md:gap-3 mb-4 md:mb-5">
         <div className="flex flex-wrap items-center gap-2 md:gap-3">
-          <h2 className="text-base font-semibold text-white">Campaign Performance</h2>
-          {/* Days selector */}
+          <h2 className="text-base font-semibold theme-text-primary">Campaign Performance</h2>
           {onDaysChange && (
-            <div className="flex items-center bg-[#0B0F19] border border-[#1E293B] rounded-lg p-0.5 text-xs font-medium">
+            <div className="flex items-center theme-inset border theme-border rounded-lg p-0.5 text-xs font-medium">
               {[7, 14, 30].map((d) => (
                 <button
                   key={d}
@@ -91,7 +111,7 @@ export default function CampaignChart({
                   className={`px-2.5 py-1 rounded-md transition-colors ${
                     days === d
                       ? 'bg-accent text-white shadow-sm font-semibold'
-                      : 'text-[#94A3B8] hover:text-white'
+                      : 'theme-text-secondary hover:theme-text-primary'
                   }`}
                 >
                   {d}d
@@ -101,9 +121,8 @@ export default function CampaignChart({
           )}
         </div>
 
-        {/* Legend */}
         {!isEmpty && !loading && !error && (
-          <div className="flex flex-wrap items-center gap-3 md:gap-4 text-xs text-[#94A3B8]">
+          <div className="flex flex-wrap items-center gap-3 md:gap-4 text-xs theme-text-secondary">
             <span className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-[#2563EB]" />
               Sent
@@ -116,40 +135,39 @@ export default function CampaignChart({
         )}
       </div>
 
-      {/* Content */}
       {loading ? (
         <div className="flex flex-col items-center justify-center" style={{ height: chartHeight }}>
-          <div className="w-full h-full bg-[#182234] rounded-xl animate-pulse flex items-center justify-center text-xs text-[#94A3B8]">
+          <div className="w-full h-full theme-skeleton rounded-xl animate-pulse flex items-center justify-center text-xs theme-text-secondary">
             Loading performance data...
           </div>
         </div>
       ) : error ? (
-        <div className="flex flex-col items-center justify-center text-[#94A3B8] gap-2" style={{ height: chartHeight }}>
+        <div className="flex flex-col items-center justify-center theme-text-secondary gap-2" style={{ height: chartHeight }}>
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="1.5">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
-          <p className="text-sm font-medium text-white">Failed to load performance data</p>
-          <p className="text-xs text-[#64748B]">{error}</p>
+          <p className="text-sm font-medium theme-text-primary">Failed to load performance data</p>
+          <p className="text-xs theme-text-muted">{error}</p>
           {onRetry && (
             <button
               onClick={onRetry}
-              className="mt-1 px-3 py-1.5 text-xs font-semibold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-lg transition-colors"
+              className="mt-1 px-3 py-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-lg transition-colors"
             >
               Retry
             </button>
           )}
         </div>
       ) : isEmpty ? (
-        <div className="flex flex-col items-center justify-center text-[#94A3B8]" style={{ height: chartHeight }}>
-          <div className="w-12 h-12 rounded-full bg-[#182234] border border-[#26354D] flex items-center justify-center mb-3 text-[#94A3B8]">
+        <div className="flex flex-col items-center justify-center theme-text-secondary" style={{ height: chartHeight }}>
+          <div className="w-12 h-12 rounded-full theme-inset border theme-border flex items-center justify-center mb-3">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
             </svg>
           </div>
-          <p className="text-sm font-semibold text-white">No campaign data yet</p>
-          <p className="text-xs text-[#64748B] mt-1 text-center">Your campaign performance will appear here once you start sending emails.</p>
+          <p className="text-sm font-semibold theme-text-primary">No campaign data yet</p>
+          <p className="text-xs theme-text-muted mt-1 text-center">Your campaign performance will appear here once you start sending emails.</p>
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={chartHeight}>
@@ -164,23 +182,23 @@ export default function CampaignChart({
                 <stop offset="95%" stopColor="#7C3AED" stopOpacity={0.0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} vertical={false} />
             <XAxis
               dataKey="date"
               tickFormatter={formatShortDate}
-              tick={{ fontSize: 11, fill: '#64748B' }}
+              tick={{ fontSize: 11, fill: chartColors.tick }}
               axisLine={false}
               tickLine={false}
               dy={8}
               interval={tickInterval}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: '#64748B' }}
+              tick={{ fontSize: 11, fill: chartColors.tick }}
               axisLine={false}
               tickLine={false}
               allowDecimals={false}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<ChartTooltip />} />
             <Area
               type="monotone"
               dataKey="sent"

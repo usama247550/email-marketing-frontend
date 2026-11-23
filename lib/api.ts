@@ -1,6 +1,8 @@
 // ---------------------------------------------------------------------------
-// API client — all fetch() calls to the Express backend live here
+// API client — all authFetch() calls to the Express backend live here
 // ---------------------------------------------------------------------------
+
+import { authFetch } from '@/lib/auth';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
 
@@ -61,7 +63,7 @@ export interface RecentCampaignItem {
 export async function fetchDashboardStats(project: string): Promise<DashboardStatsResponse> {
   const qs = project && project !== 'all' ? `?project=${encodeURIComponent(project)}` : '';
   const url = `${API_BASE}/api/dashboard/stats${qs}`;
-  const res = await fetch(url, { cache: 'no-store' });
+  const res = await authFetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Failed to fetch dashboard stats: ${res.status}`);
   const json = await res.json();
   if (!json.success) throw new Error(json.error ?? 'Unknown API error');
@@ -74,7 +76,7 @@ export async function getDashboardPerformance(projectId?: string, days = 14): Pr
   if (projectId && projectId !== 'all') params.set('projectId', projectId);
   const qs = params.toString() ? `?${params.toString()}` : '';
   const url = `${API_BASE}/api/dashboard/performance${qs}`;
-  const res = await fetch(url, { cache: 'no-store' });
+  const res = await authFetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Failed to fetch performance: ${res.status}`);
   const json = await res.json();
   if (!json.success) throw new Error(json.message ?? json.error ?? 'Failed to fetch performance');
@@ -87,7 +89,7 @@ export async function getRecentCampaigns(projectId?: string, limit = 5): Promise
   if (projectId && projectId !== 'all') params.set('projectId', projectId);
   const qs = params.toString() ? `?${params.toString()}` : '';
   const url = `${API_BASE}/api/dashboard/recent-campaigns${qs}`;
-  const res = await fetch(url, { cache: 'no-store' });
+  const res = await authFetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Failed to fetch recent campaigns: ${res.status}`);
   const json = await res.json();
   if (!json.success) throw new Error(json.message ?? json.error ?? 'Failed to fetch recent campaigns');
@@ -95,7 +97,7 @@ export async function getRecentCampaigns(projectId?: string, limit = 5): Promise
 }
 
 export async function fetchProjects() {
-  const res = await fetch(`${API_BASE}/api/projects`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/projects`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Failed to fetch projects: ${res.status}`);
   const json = await res.json();
   return json.data;
@@ -103,7 +105,7 @@ export async function fetchProjects() {
 
 export async function fetchCampaigns(project?: string) {
   const qs = project && project !== 'all' ? `?project=${encodeURIComponent(project)}` : '';
-  const res = await fetch(`${API_BASE}/api/campaigns${qs}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_BASE}/api/campaigns${qs}`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Failed to fetch campaigns: ${res.status}`);
   const json = await res.json();
   return json.data as ApiCampaign[];
@@ -129,7 +131,7 @@ export interface Project {
 
 export async function getProjects(): Promise<Project[]> {
   try {
-    const res = await fetch(`${API_BASE}/api/projects`, { cache: 'no-store' });
+    const res = await authFetch(`${API_BASE}/api/projects`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`Failed to fetch projects: ${res.status}`);
     const json = await res.json();
     if (!json.success) throw new Error(json.message || 'Failed to fetch projects');
@@ -142,7 +144,7 @@ export async function getProjects(): Promise<Project[]> {
 
 export async function getProject(id: string): Promise<Project> {
   try {
-    const res = await fetch(`${API_BASE}/api/projects/${id}`, { cache: 'no-store' });
+    const res = await authFetch(`${API_BASE}/api/projects/${id}`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`Failed to fetch project: ${res.status}`);
     const json = await res.json();
     if (!json.success) throw new Error(json.message || 'Failed to fetch project');
@@ -155,7 +157,7 @@ export async function getProject(id: string): Promise<Project> {
 
 export async function createProject(data: Partial<Project>): Promise<Project> {
   try {
-    const res = await fetch(`${API_BASE}/api/projects`, {
+    const res = await authFetch(`${API_BASE}/api/projects`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -174,7 +176,7 @@ export async function createProject(data: Partial<Project>): Promise<Project> {
 
 export async function updateProject(id: string, data: Partial<Project>): Promise<Project> {
   try {
-    const res = await fetch(`${API_BASE}/api/projects/${id}`, {
+    const res = await authFetch(`${API_BASE}/api/projects/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -193,7 +195,7 @@ export async function updateProject(id: string, data: Partial<Project>): Promise
 
 export async function deleteProject(id: string): Promise<void> {
   try {
-    const res = await fetch(`${API_BASE}/api/projects/${id}`, {
+    const res = await authFetch(`${API_BASE}/api/projects/${id}`, {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error(`Failed to delete project: ${res.status}`);
@@ -219,7 +221,7 @@ export interface Template {
 
 export async function getTemplates(): Promise<Template[]> {
   try {
-    const res = await fetch(`${API_BASE}/api/templates`, { cache: 'no-store' });
+    const res = await authFetch(`${API_BASE}/api/templates`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`Failed to fetch templates: ${res.status}`);
     const json = await res.json();
     if (!json.success) throw new Error(json.message || 'Failed to fetch templates');
@@ -232,7 +234,7 @@ export async function getTemplates(): Promise<Template[]> {
 
 export async function getTemplate(id: string): Promise<Template> {
   try {
-    const res = await fetch(`${API_BASE}/api/templates/${id}`, { cache: 'no-store' });
+    const res = await authFetch(`${API_BASE}/api/templates/${id}`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`Failed to fetch template: ${res.status}`);
     const json = await res.json();
     if (!json.success) throw new Error(json.message || 'Failed to fetch template');
@@ -245,7 +247,7 @@ export async function getTemplate(id: string): Promise<Template> {
 
 export async function createTemplate(data: Partial<Template>): Promise<Template> {
   try {
-    const res = await fetch(`${API_BASE}/api/templates`, {
+    const res = await authFetch(`${API_BASE}/api/templates`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -265,7 +267,7 @@ export async function createTemplate(data: Partial<Template>): Promise<Template>
 
 export async function updateTemplate(id: string, data: Partial<Template>): Promise<Template> {
   try {
-    const res = await fetch(`${API_BASE}/api/templates/${id}`, {
+    const res = await authFetch(`${API_BASE}/api/templates/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -285,7 +287,7 @@ export async function updateTemplate(id: string, data: Partial<Template>): Promi
 
 export async function deleteTemplate(id: string): Promise<void> {
   try {
-    const res = await fetch(`${API_BASE}/api/templates/${id}`, {
+    const res = await authFetch(`${API_BASE}/api/templates/${id}`, {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error(`Failed to delete template: ${res.status}`);
@@ -357,7 +359,7 @@ export interface ImportCsvResponse {
 
 export async function getBatches(page: number = 1, limit: number = 15): Promise<BatchesResponse> {
   try {
-    const res = await fetch(`${API_BASE}/api/batches?page=${page}&limit=${limit}`, { 
+    const res = await authFetch(`${API_BASE}/api/batches?page=${page}&limit=${limit}`, { 
       cache: 'no-store' 
     });
     if (!res.ok) throw new Error(`Failed to fetch batches: ${res.status}`);
@@ -371,7 +373,7 @@ export async function getBatches(page: number = 1, limit: number = 15): Promise<
 
 export async function getBatchLeads(batchId: string, page: number = 1, limit: number = 15): Promise<LeadsResponse> {
   try {
-    const res = await fetch(`${API_BASE}/api/leads/batch/${batchId}?page=${page}&limit=${limit}`, { 
+    const res = await authFetch(`${API_BASE}/api/leads/batch/${batchId}?page=${page}&limit=${limit}`, { 
       cache: 'no-store' 
     });
     if (!res.ok) throw new Error(`Failed to fetch batch leads: ${res.status}`);
@@ -387,7 +389,7 @@ export async function updateLead(
   leadId: string,
   data: Partial<Pick<Lead, 'company' | 'city' | 'website' | 'email'>>
 ): Promise<{ message: string; lead: Lead }> {
-  const res = await fetch(`${API_BASE}/api/leads/${leadId}`, {
+  const res = await authFetch(`${API_BASE}/api/leads/${leadId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -398,7 +400,7 @@ export async function updateLead(
 }
 
 export async function deleteLead(leadId: string): Promise<{ message: string; deletedLead: Lead }> {
-  const res = await fetch(`${API_BASE}/api/leads/${leadId}`, { method: 'DELETE' });
+  const res = await authFetch(`${API_BASE}/api/leads/${leadId}`, { method: 'DELETE' });
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || `Failed to delete lead: ${res.status}`);
   return json;
@@ -411,7 +413,7 @@ export async function verifyBatchEmails(batchId: string): Promise<{
   total: number;
   sendableLeadCount: number;
 }> {
-  const res = await fetch(`${API_BASE}/api/batches/${batchId}/verify-emails`, { method: 'POST' });
+  const res = await authFetch(`${API_BASE}/api/batches/${batchId}/verify-emails`, { method: 'POST' });
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || `Verify failed: ${res.status}`);
   return json;
@@ -419,7 +421,7 @@ export async function verifyBatchEmails(batchId: string): Promise<{
 
 export async function deleteBatch(batchId: string): Promise<{ message: string; deletedBatch: Batch; deletedLeadsCount: number }> {
   try {
-    const res = await fetch(`${API_BASE}/api/batches/${batchId}`, {
+    const res = await authFetch(`${API_BASE}/api/batches/${batchId}`, {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error(`Failed to delete batch: ${res.status}`);
@@ -436,7 +438,7 @@ export async function importCsv(file: File): Promise<ImportCsvResponse> {
     const formData = new FormData();
     formData.append('csvFile', file);
 
-    const res = await fetch(`${API_BASE}/api/batches/import-csv`, {
+    const res = await authFetch(`${API_BASE}/api/batches/import-csv`, {
       method: 'POST',
       body: formData, // Don't set Content-Type header for multipart/form-data
     });
@@ -462,7 +464,7 @@ export interface EmailApiAccount {
 
 export async function getEmailApiAccounts(): Promise<EmailApiAccount[]> {
   try {
-    const res = await fetch(`${API_BASE}/api/email-api-accounts`, { cache: 'no-store' });
+    const res = await authFetch(`${API_BASE}/api/email-api-accounts`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`Failed to fetch email API accounts: ${res.status}`);
     const json = await res.json();
     if (!json.success) throw new Error(json.message || 'Failed to fetch email API accounts');
@@ -475,7 +477,7 @@ export async function getEmailApiAccounts(): Promise<EmailApiAccount[]> {
 
 export async function getEmailApiAccount(id: string): Promise<EmailApiAccount> {
   try {
-    const res = await fetch(`${API_BASE}/api/email-api-accounts/${id}`, { cache: 'no-store' });
+    const res = await authFetch(`${API_BASE}/api/email-api-accounts/${id}`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`Failed to fetch email API account: ${res.status}`);
     const json = await res.json();
     if (!json.success) throw new Error(json.message || 'Failed to fetch email API account');
@@ -488,7 +490,7 @@ export async function getEmailApiAccount(id: string): Promise<EmailApiAccount> {
 
 export async function createEmailApiAccount(data: Partial<EmailApiAccount>): Promise<EmailApiAccount> {
   try {
-    const res = await fetch(`${API_BASE}/api/email-api-accounts`, {
+    const res = await authFetch(`${API_BASE}/api/email-api-accounts`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -507,7 +509,7 @@ export async function createEmailApiAccount(data: Partial<EmailApiAccount>): Pro
 
 export async function updateEmailApiAccount(id: string, data: Partial<EmailApiAccount>): Promise<EmailApiAccount> {
   try {
-    const res = await fetch(`${API_BASE}/api/email-api-accounts/${id}`, {
+    const res = await authFetch(`${API_BASE}/api/email-api-accounts/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -526,7 +528,7 @@ export async function updateEmailApiAccount(id: string, data: Partial<EmailApiAc
 
 export async function deleteEmailApiAccount(id: string): Promise<void> {
   try {
-    const res = await fetch(`${API_BASE}/api/email-api-accounts/${id}`, {
+    const res = await authFetch(`${API_BASE}/api/email-api-accounts/${id}`, {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error(`Failed to delete email API account: ${res.status}`);
@@ -570,7 +572,7 @@ export interface ApiAutomation {
 
 export async function getAutomations(): Promise<ApiAutomation[]> {
   try {
-    const res = await fetch(`${API_BASE}/api/automations`, { cache: 'no-store' });
+    const res = await authFetch(`${API_BASE}/api/automations`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`Failed to fetch automations: ${res.status}`);
     const json = await res.json();
     if (!json.success) throw new Error(json.message || 'Failed to fetch automations');
@@ -597,7 +599,7 @@ export interface CreateAutomationPayload {
 
 export async function createAutomation(data: CreateAutomationPayload): Promise<ApiAutomation> {
   try {
-    const res = await fetch(`${API_BASE}/api/automations`, {
+    const res = await authFetch(`${API_BASE}/api/automations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -620,7 +622,7 @@ export async function updateAutomation(
   data: Partial<CreateAutomationPayload> & { status?: 'active' | 'paused' }
 ): Promise<ApiAutomation> {
   try {
-    const res = await fetch(`${API_BASE}/api/automations/${id}`, {
+    const res = await authFetch(`${API_BASE}/api/automations/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -640,7 +642,7 @@ export async function updateAutomation(
 
 export async function deleteAutomation(id: string): Promise<void> {
   try {
-    const res = await fetch(`${API_BASE}/api/automations/${id}`, { method: 'DELETE' });
+    const res = await authFetch(`${API_BASE}/api/automations/${id}`, { method: 'DELETE' });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.message || `Failed to delete automation: ${res.status}`);
@@ -738,7 +740,7 @@ export interface MultiNicheSearchResult {
 export async function triggerMultiNicheSearch(
   payload: MultiNicheSearchPayload,
 ): Promise<{ jobId: string }> {
-  const res = await fetch(`${API_BASE}/api/lead-finder/multi-niche-search`, {
+  const res = await authFetch(`${API_BASE}/api/lead-finder/multi-niche-search`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(payload),
@@ -757,7 +759,7 @@ export async function triggerMultiNicheSearch(
  * Returns the current status of a running or finished multi-niche job.
  */
 export async function pollMultiNicheJob(jobId: string): Promise<MultiNicheJobStatus> {
-  const res = await fetch(`${API_BASE}/api/lead-finder/status/${encodeURIComponent(jobId)}`, {
+  const res = await authFetch(`${API_BASE}/api/lead-finder/status/${encodeURIComponent(jobId)}`, {
     cache: 'no-store',
   });
   if (!res.ok) {
@@ -774,7 +776,7 @@ export async function pollMultiNicheJob(jobId: string): Promise<MultiNicheJobSta
 export async function stopMultiNicheSearch(
   jobId: string,
 ): Promise<{ success: boolean; message: string; savedSoFar: number; batchId?: string }> {
-  const res = await fetch(
+  const res = await authFetch(
     `${API_BASE}/api/lead-finder/multi-niche-search/${encodeURIComponent(jobId)}/stop`,
     { method: 'POST' },
   );
@@ -885,7 +887,7 @@ export async function startSmartSearch(payload: {
   leadsCount:      number;
   strictness:      string;
 }): Promise<{ jobId: string }> {
-  const res = await fetch(`${API_BASE}/api/lead-finder/smart-search`, {
+  const res = await authFetch(`${API_BASE}/api/lead-finder/smart-search`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(payload),
@@ -904,7 +906,7 @@ export async function startSmartSearch(payload: {
  * Same endpoint, typed for the smart job response shape.
  */
 export async function getSmartSearchStatus(jobId: string): Promise<SmartJobStatus> {
-  const res = await fetch(`${API_BASE}/api/lead-finder/status/${encodeURIComponent(jobId)}`, {
+  const res = await authFetch(`${API_BASE}/api/lead-finder/status/${encodeURIComponent(jobId)}`, {
     cache: 'no-store',
   });
   if (!res.ok) {
@@ -922,7 +924,7 @@ export async function saveSmartSearch(
   jobId: string,
   selectedEmails: string[],
 ): Promise<{ success: boolean; batchId: string; batchName: string; savedCount: number }> {
-  const res = await fetch(`${API_BASE}/api/lead-finder/smart-search/${encodeURIComponent(jobId)}/save`, {
+  const res = await authFetch(`${API_BASE}/api/lead-finder/smart-search/${encodeURIComponent(jobId)}/save`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify({ selectedEmails }),
@@ -939,7 +941,7 @@ export async function saveSmartSearch(
  * Requests a graceful stop; pipeline finishes current batch and completes with partial results.
  */
 export async function stopSmartSearch(jobId: string): Promise<{ success: boolean; message: string }> {
-  const res = await fetch(`${API_BASE}/api/lead-finder/smart-search/${encodeURIComponent(jobId)}/stop`, {
+  const res = await authFetch(`${API_BASE}/api/lead-finder/smart-search/${encodeURIComponent(jobId)}/stop`, {
     method: 'POST',
   });
   if (!res.ok) {

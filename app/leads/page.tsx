@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Topbar from '@/components/dashboard/Topbar';
 import { getBatches, getBatchLeads, deleteBatch, deleteLead, updateLead, importCsv, getProjects, type Batch, type Lead, type BatchesResponse, type LeadsResponse, type Project } from '@/lib/api';
+import { authFetch } from '@/lib/auth';
 
 // Remove mock data - we'll use real API data now
 
@@ -80,7 +81,7 @@ export default function LeadsPage() {
         queryParams.set('projectId', selectedProject);
       }
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/batches?${queryParams}`, {
+      const response = await authFetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/batches?${queryParams}`, {
         cache: 'no-store'
       });
       
@@ -246,7 +247,7 @@ export default function LeadsPage() {
         formData.append('projectId', importProjectId);
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/batches/import-csv`, {
+      const response = await authFetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/batches/import-csv`, {
         method: 'POST',
         body: formData,
       });

@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { clearAuthAndRedirectToLogin } from '@/lib/auth';
 
 interface NavItem {
   label: string;
@@ -115,6 +116,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -251,6 +253,30 @@ export default function Sidebar() {
           );
         })}
       </nav>
+
+      <div className="p-2 border-t border-[#1E293B]/40 space-y-1">
+        <button
+          type="button"
+          onClick={() => {
+            clearAuthAndRedirectToLogin();
+            router.push('/login');
+          }}
+          className={`
+            w-full flex items-center gap-2.5 py-2.5 rounded-lg text-xs font-medium text-[#94A3B8] hover:text-white hover:bg-white/5 active:scale-98 transition-all min-h-[44px]
+            ${collapsed ? 'lg:justify-center px-0' : 'px-3'}
+          `}
+          title="Log out"
+        >
+          <span className="shrink-0">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+          </span>
+          <span className={`truncate ${collapsed ? 'lg:hidden' : ''}`}>Log out</span>
+        </button>
+      </div>
 
       {/* Bottom Toggle Button (desktop only) */}
       <div className="hidden lg:block p-2 border-t border-[#1E293B]/40">

@@ -12,6 +12,7 @@ import {
   type Batch,
 } from '@/lib/api';
 import { estimateSendDurationMinutes } from '@/lib/sendPace';
+import { authFetch } from '@/lib/auth';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -83,7 +84,7 @@ function SendingPageContent() {
       queryParams.set('limit', '100'); // Get all batches for the project
       queryParams.set('projectId', projectId);
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/batches?${queryParams}`, {
+      const response = await authFetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/batches?${queryParams}`, {
         cache: 'no-store'
       });
       
@@ -256,7 +257,7 @@ function SendingPageContent() {
         partGapMinutes,
       };
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/campaigns`, {
+      const response = await authFetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/campaigns`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

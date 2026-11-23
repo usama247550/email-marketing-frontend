@@ -13,38 +13,35 @@ function formatNumber(n: number | string): string {
   return n.toLocaleString('en-US');
 }
 
-// Animated number counter hook
 function useCountAnimation(target: number | string, duration: number = 800): number {
   const [count, setCount] = useState<number>(0);
-  
+
   useEffect(() => {
     if (typeof target === 'string') return;
-    
+
     const targetNum = Number(target);
     if (isNaN(targetNum)) return;
-    
+
     let startTime: number | null = null;
     let animationId: number;
-    
+
     const animate = (currentTime: number) => {
       if (startTime === null) startTime = currentTime;
       const elapsed = currentTime - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      
-      // Start from 1, animate to target
       const currentCount = Math.floor(1 + (targetNum - 1) * progress);
       setCount(currentCount);
-      
+
       if (progress < 1) {
         animationId = requestAnimationFrame(animate);
       }
     };
-    
+
     animationId = requestAnimationFrame(animate);
-    
+
     return () => cancelAnimationFrame(animationId);
   }, [target, duration]);
-  
+
   return count;
 }
 
@@ -75,7 +72,7 @@ const STAT_ICONS: Record<string, React.ReactNode> = {
       <circle cx="12" cy="12" r="3" />
     </svg>
   ),
-  'Unsubscribed': (
+  Unsubscribed: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
       <circle cx="8.5" cy="7" r="4" />
@@ -90,31 +87,31 @@ export default function StatsCard({ title, value, change = 0, showChange = true,
   const animatedCount = useCountAnimation(value, 800);
 
   return (
-    <div className="bg-[#111827] rounded-2xl border border-[#1E293B] shadow-sm px-5 py-4 flex flex-col justify-between gap-3 hover:border-[#2E3C54] hover:shadow-md transition-all duration-200">
+    <div className="theme-card rounded-2xl border px-5 py-4 flex flex-col justify-between gap-3 theme-card-hover transition-all duration-200">
       <div className="flex items-center gap-2.5">
-        <div className="w-7 h-7 rounded-full bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0">
+        <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-500 dark:text-blue-400 flex items-center justify-center shrink-0">
           {STAT_ICONS[title] || (
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="8" />
             </svg>
           )}
         </div>
-        <p className="text-xs font-medium text-[#94A3B8] tracking-wide">{title}</p>
+        <p className="text-xs font-medium theme-text-secondary tracking-wide">{title}</p>
       </div>
 
       {loading ? (
         <>
-          <div className="h-8 w-20 bg-[#182234] rounded-lg animate-pulse" />
-          <div className="h-4 w-28 bg-[#182234] rounded-lg animate-pulse" />
+          <div className="h-8 w-20 theme-skeleton rounded-lg animate-pulse" />
+          <div className="h-4 w-28 theme-skeleton rounded-lg animate-pulse" />
         </>
       ) : (
         <div className="space-y-2">
-          <p className="text-3xl font-bold text-white tracking-tight leading-none">
+          <p className="text-3xl font-bold theme-text-primary tracking-tight leading-none">
             {formatNumber(typeof value === 'string' ? value : animatedCount)}
           </p>
           {showChange && (
             <div className="flex items-center gap-1.5 text-xs">
-              <span className={`flex items-center font-semibold gap-0.5 ${positive ? 'text-emerald-400' : 'text-rose-400'}`}>
+              <span className={`flex items-center font-semibold gap-0.5 ${positive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                   {positive ? (
                     <polyline points="18 15 12 9 6 15" />
@@ -122,9 +119,12 @@ export default function StatsCard({ title, value, change = 0, showChange = true,
                     <polyline points="6 9 12 15 18 9" />
                   )}
                 </svg>
-                <span>{positive ? '+' : ''}{change}%</span>
+                <span>
+                  {positive ? '+' : ''}
+                  {change}%
+                </span>
               </span>
-              <span className="text-[#64748B]">from last run</span>
+              <span className="theme-text-muted">from last run</span>
             </div>
           )}
         </div>
