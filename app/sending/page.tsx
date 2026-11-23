@@ -10,8 +10,8 @@ import {
   type Project,
   type Template,
   type Batch,
-  type Lead
 } from '@/lib/api';
+import { estimateSendDurationMinutes } from '@/lib/sendPace';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,6 +24,9 @@ interface CampaignRequest {
   projectId: string;
   templateId: string;
   batchIds: string[];
+  emailGapSeconds: number;
+  partCount: number;
+  partGapMinutes: number;
 }
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
@@ -148,9 +151,19 @@ function SendingPageContent() {
   const [batchSearch, setBatchSearch] = useState('');
   const [templateSearch, setTemplateSearch] = useState('');
   
+  // Send pacing
+  const [emailGapSeconds, setEmailGapSeconds] = useState(30);
+  const [partCount, setPartCount] = useState(1);
+  const [partGapMinutes, setPartGapMinutes] = useState(0);
+
   // Sending states
   const [sending, setSending] = useState(false);
-  const [sendResult, setSendResult] = useState<{ sentCount: number; totalRecipients: number } | null>(null);
+  const [sendResult, setSendResult] = useState<{
+    totalRecipients: number;
+    startedInBackground?: boolean;
+    message?: string;
+    estimateMinutes?: number;
+  } | null>(null);
 
   // Filter batches by search (sorted newest first)
   const filteredBatches = batches.filter(batch =>
@@ -171,7 +184,21 @@ function SendingPageContent() {
   };
 
   // Check if ready to send
-  const canSend = selectedProject && selectedBatches.length > 0 && selectedTemplate && !sending;
+  const totalLeads = getTotalValidLeads();
+  const paceEstimateMin = estimateSendDurationMinutes(
+    totalLeads,
+    emailGapSeconds,
+    partCount,
+    partGapMinutes
+  );
+
+  const canSend =
+    selectedProject &&
+    selectedBatches.length > 0 &&
+    selectedTemplate &&
+    !sending &&
+    emailGapSeconds >= 1 &&
+    partCount >= 1;
 
   // Format date helper
   const formatDate = (dateString: string) => {
@@ -223,7 +250,10 @@ function SendingPageContent() {
         name: `Campaign - ${selectedTemplate.name} - ${new Date().toLocaleDateString()}`,
         projectId: selectedProject._id,
         templateId: selectedTemplate._id,
-        batchIds: selectedBatches.map(batch => batch._id)
+        batchIds: selectedBatches.map(batch => batch._id),
+        emailGapSeconds,
+        partCount,
+        partGapMinutes,
       };
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/campaigns`, {
@@ -241,8 +271,10 @@ function SendingPageContent() {
 
       const result = await response.json();
       setSendResult({
-        sentCount: result.data.sentCount,
-        totalRecipients: result.data.totalRecipients
+        totalRecipients: result.data?.totalRecipients ?? totalLeads,
+        startedInBackground: Boolean(result.startedInBackground),
+        message: result.message,
+        estimateMinutes: result.estimateMinutes,
       });
       setShowSuccessModal(true);
 
@@ -439,6 +471,60 @@ function SendingPageContent() {
                 {isViewMode ? 'View template' : 'Choose template'}
               </button>
             </div>
+              </div>
+
+              {/* Send pace */}
+              <div className="bg-white rounded-xl border border-gray-100 p-4 sm:p-6">
+                <h3 className="text-sm font-semibold text-gray-900 mb-1">Send pace</h3>
+                <p className="text-xs text-gray-500 mb-4">
+                  Control delay between each email and split the list into parts with a longer pause between parts.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Gap between emails (seconds)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={600}
+                      value={emailGapSeconds}
+                      onChange={(e) => setEmailGapSeconds(Math.max(1, parseInt(e.target.value, 10) || 30))}
+                      className="w-full px-3 py-2.5 min-h-[40px] text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
+                    />
+                    <p className="mt-1 text-xs text-gray-400">e.g. 30 or 60 for 1 minute</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Split into parts</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={partCount}
+                      onChange={(e) => setPartCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      className="w-full px-3 py-2.5 min-h-[40px] text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
+                    />
+                    <p className="mt-1 text-xs text-gray-400">5 parts ≈ list ÷ 5 per burst</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Gap between parts (minutes)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={180}
+                      value={partGapMinutes}
+                      onChange={(e) => setPartGapMinutes(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                      className="w-full px-3 py-2.5 min-h-[40px] text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
+                    />
+                    <p className="mt-1 text-xs text-gray-400">0 = no pause between parts</p>
+                  </div>
+                </div>
+                {totalLeads > 0 && (
+                  <p className="mt-4 text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+                    {totalLeads} leads → ~{paceEstimateMin > 0 ? paceEstimateMin : 'under 1'} min of waiting (plus time to send each email).
+                    {partCount > 1 && (
+                      <> Roughly {Math.ceil(totalLeads / partCount)} emails per part when split evenly.</>
+                    )}
+                  </p>
+                )}
               </div>
               
               {/* Email Preview */}
@@ -696,6 +782,26 @@ function SendingPageContent() {
                       <span className="text-gray-500 shrink-0">Template:</span>
                       <span className="text-gray-700 text-right truncate" title={selectedTemplate?.name}>{selectedTemplate?.name}</span>
                     </div>
+                    <div className="pt-2 mt-2 border-t border-gray-100">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Email gap:</span>
+                        <span className="text-gray-700">{emailGapSeconds}s</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Parts:</span>
+                        <span className="text-gray-700">{partCount}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Part gap:</span>
+                        <span className="text-gray-700">{partGapMinutes} min</span>
+                      </div>
+                      {paceEstimateMin > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Est. pace:</span>
+                          <span className="text-gray-700">~{paceEstimateMin} min</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -724,12 +830,15 @@ function SendingPageContent() {
                 <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <CheckIcon />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Campaign Started!</h3>
-                <p className="text-gray-600 mb-4">
-                  {sendResult ? 
-                    `${sendResult.sentCount} of ${sendResult.totalRecipients} emails sent successfully` :
-                    `${getTotalValidLeads()} emails queued for sending`
-                  }
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Campaign started</h3>
+                <p className="text-gray-600 mb-4 text-sm leading-relaxed">
+                  {sendResult?.message ??
+                    `${sendResult?.totalRecipients ?? getTotalValidLeads()} emails are queued.`}
+                  {sendResult?.startedInBackground && (
+                    <span className="block mt-2 text-gray-500">
+                      Sending runs in the background. Check the Campaigns page for live progress.
+                    </span>
+                  )}
                 </p>
                 <div className="w-8 h-1 bg-green-600 rounded mx-auto"></div>
               </div>

@@ -563,6 +563,9 @@ export interface ApiAutomation {
   lastRunFoundCount?: number;
   lastRunFinderStatus?: 'ok' | 'failed' | 'skipped';
   lastRunFinderMessage?: string;
+  emailGapSeconds?: number;
+  partCount?: number;
+  partGapMinutes?: number;
 }
 
 export async function getAutomations(): Promise<ApiAutomation[]> {
@@ -587,6 +590,9 @@ export interface CreateAutomationPayload {
   status?: 'active' | 'paused';
   leadSource: 'existing' | 'finder';
   finder?: AutomationFinderConfig;
+  emailGapSeconds?: number;
+  partCount?: number;
+  partGapMinutes?: number;
 }
 
 export async function createAutomation(data: CreateAutomationPayload): Promise<ApiAutomation> {

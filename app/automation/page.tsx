@@ -16,6 +16,7 @@ import {
   type CreateAutomationPayload,
   type AutomationFinderConfig,
 } from '@/lib/api';
+import { estimateSendDurationMinutes } from '@/lib/sendPace';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,6 +38,9 @@ interface AutomationFormData {
   finderAllCities: boolean;
   finderNiches: string[];
   finderLeadsPerDay: number;
+  emailGapSeconds: number;
+  partCount: number;
+  partGapMinutes: number;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -49,6 +53,9 @@ const EMPTY_FORM: AutomationFormData = {
   templateId: '',
   dailyLimit: 50,
   scheduledTime: '09:00',
+  emailGapSeconds: 30,
+  partCount: 1,
+  partGapMinutes: 20,
   leadSource: 'existing',
   finderCountry: 'Germany',
   finderCity: 'Frankfurt',
@@ -394,6 +401,9 @@ export default function AutomationPage() {
       finderAllCities:   Boolean(automation.finder?.allCities),
       finderNiches:      Array.isArray(automation.finder?.niches) ? [...automation.finder.niches] : [],
       finderLeadsPerDay: typeof automation.finder?.leadsPerDay === 'number' ? automation.finder.leadsPerDay : 50,
+      emailGapSeconds: automation.emailGapSeconds ?? 30,
+      partCount: automation.partCount ?? 1,
+      partGapMinutes: automation.partGapMinutes ?? 20,
     });
 
     setCountrySearchTerm(country);
@@ -476,6 +486,9 @@ export default function AutomationPage() {
         templateId:    form.templateId,
         dailyLimit:    form.dailyLimit,
         scheduledTime: form.scheduledTime,
+        emailGapSeconds: form.emailGapSeconds,
+        partCount: form.partCount,
+        partGapMinutes: form.partGapMinutes,
         leadSource:    form.leadSource,
         ...(form.leadSource === 'finder'
           ? {
@@ -685,6 +698,9 @@ export default function AutomationPage() {
                         <div className="text-gray-500">Schedule</div>
                         <div className="text-gray-900 font-medium mt-0.5">{formatTime(automation.scheduledTime)} daily</div>
                         <div className="text-gray-500 mt-0.5">{automation.dailyLimit} emails/day</div>
+                        <div className="text-gray-400 mt-0.5 text-[11px]">
+                          {automation.emailGapSeconds ?? 30}s gap · {automation.partCount ?? 1} parts · {automation.partGapMinutes ?? 0}m between
+                        </div>
                       </div>
                       <div>
                         <div className="text-gray-500">Last Run</div>
@@ -798,6 +814,9 @@ export default function AutomationPage() {
                         </div>
                         <div className="text-xs text-gray-500 mt-0.5">
                           {automation.dailyLimit} emails/day max
+                        </div>
+                        <div className="text-gray-400 text-[11px] mt-0.5">
+                          Pace: {automation.emailGapSeconds ?? 30}s · {automation.partCount ?? 1} parts · {automation.partGapMinutes ?? 0}m gap
                         </div>
                       </td>
 
@@ -1255,6 +1274,61 @@ export default function AutomationPage() {
                   </p>
                 </div>
               )}
+
+              {/* Send pace */}
+              <div className="border border-gray-100 rounded-lg p-4 bg-gray-50/50">
+                <h4 className="text-sm font-semibold text-gray-900 mb-1">Send pace (each run)</h4>
+                <p className="text-xs text-gray-500 mb-3">
+                  Same as manual send: delay between emails and optional parts with a longer pause.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Gap between emails (sec)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={600}
+                      value={form.emailGapSeconds}
+                      onChange={e => setForm(f => ({ ...f, emailGapSeconds: Math.max(1, parseInt(e.target.value, 10) || 30) }))}
+                      className="w-full px-3 py-2 min-h-[40px] text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Parts</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={form.partCount}
+                      onChange={e => setForm(f => ({ ...f, partCount: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
+                      className="w-full px-3 py-2 min-h-[40px] text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Gap between parts (min)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={180}
+                      value={form.partGapMinutes}
+                      onChange={e => setForm(f => ({ ...f, partGapMinutes: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
+                      className="w-full px-3 py-2 min-h-[40px] text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
+                    />
+                  </div>
+                </div>
+                {form.dailyLimit > 0 && (
+                  <p className="mt-3 text-[11px] text-gray-600">
+                    If this run sends {form.dailyLimit} emails: ~
+                    {estimateSendDurationMinutes(
+                      form.dailyLimit,
+                      form.emailGapSeconds,
+                      form.partCount,
+                      form.partGapMinutes
+                    ) || 'under 1'}{' '}
+                    min of pacing (plus API time).
+                  </p>
+                )}
+              </div>
 
               {/* Daily Limit + Time */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
