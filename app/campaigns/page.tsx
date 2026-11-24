@@ -13,7 +13,9 @@ interface Campaign {
   projectId: string;
   projectName: string;
   sentDate: string; // ISO date string
-  recipients: number;
+  status: string;
+  targetCount: number;
+  sentCount: number;
   opens: number;
   openRate: number; // percentage
   unsubscribed: number;
@@ -80,6 +82,8 @@ export default function CampaignsPage() {
         const unsubscribed = campaign.unsubscribedCount || 0;
         const unsubscribeRate = campaign.sentCount > 0 ? (unsubscribed / campaign.sentCount) * 100 : 0;
         
+        const targetCount = campaign.totalRecipients ?? campaign.sentCount ?? 0;
+
         return {
           id: campaign._id,
           name: campaign.name,
@@ -87,8 +91,10 @@ export default function CampaignsPage() {
             ? campaign.projectId._id
             : (typeof campaign.projectId === 'string' ? campaign.projectId : ''),
           projectName,
-          sentDate: campaign.createdAt, // Use createdAt as sent date
-          recipients: campaign.sentCount,
+          sentDate: campaign.sentAt || campaign.createdAt,
+          status: campaign.status || 'draft',
+          targetCount,
+          sentCount: campaign.sentCount ?? 0,
           opens: campaign.openedCount,
           openRate,
           unsubscribed,
@@ -367,8 +373,10 @@ export default function CampaignsPage() {
                       {/* 3-column stat grid */}
                       <div className="grid grid-cols-3 gap-2 text-center bg-gray-50 rounded-lg p-2.5">
                         <div>
-                          <div className="text-sm font-medium text-gray-900">{campaign.recipients.toLocaleString()}</div>
-                          <div className="text-[10px] text-gray-500 mt-0.5">Recipients</div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {campaign.sentCount}/{campaign.targetCount}
+                          </div>
+                          <div className="text-[10px] text-gray-500 mt-0.5">Sent / target</div>
                         </div>
                         <div>
                           <div className="text-sm font-medium text-gray-900">{campaign.opens.toLocaleString()}</div>
@@ -390,7 +398,8 @@ export default function CampaignsPage() {
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Campaign</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sent</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recipients</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sent / target</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Opens</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unsubscribed</th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -417,8 +426,29 @@ export default function CampaignsPage() {
                             Sent on {formatSentDate(campaign.sentDate)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{campaign.recipients.toLocaleString()}</div>
-                            <div className="text-xs text-gray-500">100%</div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {campaign.sentCount}/{campaign.targetCount}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {campaign.targetCount > 0
+                                ? `${Math.round((campaign.sentCount / campaign.targetCount) * 100)}% sent`
+                                : '—'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span
+                              className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
+                                campaign.status === 'completed'
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : campaign.status === 'failed'
+                                    ? 'bg-rose-50 text-rose-700'
+                                    : campaign.status === 'sending'
+                                      ? 'bg-blue-50 text-blue-700'
+                                      : 'bg-gray-100 text-gray-600'
+                              }`}
+                            >
+                              {campaign.status}
+                            </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">{campaign.opens.toLocaleString()}</div>

@@ -16,21 +16,20 @@ export interface ApiStats {
   unsubscribed: number;
 }
 
-export type CampaignStatus = 'Running' | 'Completed' | 'Draft';
+export type CampaignStatus = 'draft' | 'sending' | 'completed' | 'failed';
 
 export interface ApiCampaign {
   _id: string;
   name: string;
   projectId: { _id: string; name: string; slug: string } | string;
-  leadsCount: number;
+  totalRecipients?: number;
   sentCount: number;
   openedCount: number;
   unsubscribedCount?: number;
-  repliedCount: number;
-  failedCount: number;
   status: CampaignStatus;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
+  sentAt?: string | null;
 }
 
 export interface DashboardStatsResponse {
