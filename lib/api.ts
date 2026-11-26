@@ -458,6 +458,7 @@ export interface EmailApiAccount {
   name: string;
   provider: 'brevo';
   apiKey: string;
+  keyType?: 'api' | 'smtp' | 'unknown';
   createdAt: string;
 }
 

@@ -263,6 +263,7 @@ function SendingPageContent() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(campaignData),
+        signal: AbortSignal.timeout(60_000),
       });
 
       if (!response.ok) {
@@ -290,7 +291,11 @@ function SendingPageContent() {
 
     } catch (err: any) {
       console.error('Campaign send error:', err);
-      setError(err.message);
+      const msg =
+        err?.name === 'TimeoutError' || err?.name === 'AbortError'
+          ? 'Request timed out. SMTP may be wrong or backend unreachable — check Settings (Hostinger SMTP) and Railway logs.'
+          : err?.message || 'Failed to send campaign';
+      setError(msg);
     } finally {
       setSending(false);
     }

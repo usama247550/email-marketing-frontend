@@ -645,6 +645,11 @@ export default function SettingsPage() {
                       <div className="text-sm text-gray-500 mt-1 break-words">
                         <span>Provider: {account.provider}</span>
                         <span className="ml-0 sm:ml-4 block sm:inline break-all">API Key: {maskApiKey(account.apiKey)}</span>
+                        {account.keyType === 'smtp' && (
+                          <span className="block sm:inline mt-1 sm:mt-0 sm:ml-2 text-xs font-medium text-rose-600">
+                            Wrong key type (SMTP) — use xkeysib- API key
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
