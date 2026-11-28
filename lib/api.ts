@@ -497,9 +497,10 @@ export async function createEmailApiAccount(data: Partial<EmailApiAccount>): Pro
       },
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error(`Failed to create email API account: ${res.status}`);
-    const json = await res.json();
-    if (!json.success) throw new Error(json.message || 'Failed to create email API account');
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.success) {
+      throw new Error(json.message || `Failed to create email API account (${res.status})`);
+    }
     return json.data;
   } catch (error) {
     console.error('Error creating email API account:', error);
@@ -516,8 +517,8 @@ export async function updateEmailApiAccount(id: string, data: Partial<EmailApiAc
       },
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error(`Failed to update email API account: ${res.status}`);
-    const json = await res.json();
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.message || `Failed to update email API account (${res.status})`);
     if (!json.success) throw new Error(json.message || 'Failed to update email API account');
     return json.data;
   } catch (error) {

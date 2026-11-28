@@ -27,6 +27,7 @@ export default function SettingsPage() {
     apiKey: ''
   });
   const [apiAccountSaving, setApiAccountSaving] = useState(false);
+  const [apiAccountModalError, setApiAccountModalError] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showApiAccountDeleteConfirm, setShowApiAccountDeleteConfirm] = useState<string | null>(null);
   
@@ -248,12 +249,15 @@ export default function SettingsPage() {
     
     try {
       setApiAccountSaving(true);
+      setApiAccountModalError(null);
       await createEmailApiAccount(apiAccountForm);
       await loadEmailApiAccounts();
       resetApiAccountModal();
     } catch (err) {
       console.error('Error creating email API account:', err);
-      setError('Failed to create email API account. Please try again.');
+      const msg = err instanceof Error ? err.message : 'Failed to create email API account.';
+      setApiAccountModalError(msg);
+      setError(msg);
     } finally {
       setApiAccountSaving(false);
     }
@@ -269,7 +273,9 @@ export default function SettingsPage() {
       resetApiAccountModal();
     } catch (err) {
       console.error('Error updating email API account:', err);
-      setError('Failed to update email API account. Please try again.');
+      const msg = err instanceof Error ? err.message : 'Failed to update email API account.';
+      setApiAccountModalError(msg);
+      setError(msg);
     } finally {
       setApiAccountSaving(false);
     }
@@ -303,9 +309,10 @@ export default function SettingsPage() {
     setShowApiAccountModal(false);
     setApiAccountFormMode('create');
     setEditingApiAccount(null);
+    setApiAccountModalError(null);
     setApiAccountForm({
       name: '',
-      provider: 'brevo',
+      provider: 'resend',
       apiKey: ''
     });
     setShowApiKey(false);
@@ -625,7 +632,14 @@ export default function SettingsPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Email API Accounts</h3>
               <button
-                onClick={() => { setShowApiKey(false); setShowApiAccountModal(true); }}
+                onClick={() => {
+                  setShowApiKey(false);
+                  setApiAccountFormMode('create');
+                  setEditingApiAccount(null);
+                  setApiAccountModalError(null);
+                  setApiAccountForm({ name: '', provider: 'resend', apiKey: '' });
+                  setShowApiAccountModal(true);
+                }}
                 className="w-full sm:w-auto bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-4 py-2 min-h-[40px] rounded-lg transition-colors flex items-center justify-center gap-2"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -712,6 +726,11 @@ export default function SettingsPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
                   {apiAccountFormMode === 'create' ? 'Create Email API Account' : 'Edit Email API Account'}
                 </h3>
+                {apiAccountModalError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                    {apiAccountModalError}
+                  </div>
+                )}
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
