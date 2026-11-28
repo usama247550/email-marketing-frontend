@@ -23,7 +23,7 @@ export default function SettingsPage() {
   const [editingApiAccount, setEditingApiAccount] = useState<EmailApiAccount | null>(null);
   const [apiAccountForm, setApiAccountForm] = useState({
     name: '',
-    provider: 'brevo' as const,
+    provider: 'brevo' as 'brevo' | 'resend',
     apiKey: ''
   });
   const [apiAccountSaving, setApiAccountSaving] = useState(false);
@@ -41,7 +41,7 @@ export default function SettingsPage() {
     smtpPort: 465,
     smtpUser: '',
     smtpPassword: '',
-    sendingMethod: 'brevo_api' as 'smtp' | 'brevo_api',
+    sendingMethod: 'brevo_api' as 'smtp' | 'brevo_api' | 'resend_api',
     emailApiAccountId: '',
   });
 
@@ -446,25 +446,28 @@ export default function SettingsPage() {
                   </label>
                   <select
                     value={formData.sendingMethod}
-                    onChange={(e) => setFormData({...formData, sendingMethod: e.target.value as 'smtp' | 'brevo_api'})}
+                    onChange={(e) => setFormData({...formData, sendingMethod: e.target.value as 'smtp' | 'brevo_api' | 'resend_api'})}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
                     disabled={saving}
                   >
+                    <option value="resend_api">Resend API (recommended on Railway)</option>
                     <option value="brevo_api">Brevo API</option>
-                    <option value="smtp">SMTP</option>
+                    <option value="smtp">SMTP (may timeout on Railway)</option>
                   </select>
                 </div>
 
-                {formData.sendingMethod === 'brevo_api' && (
+                {(formData.sendingMethod === 'brevo_api' || formData.sendingMethod === 'resend_api') && (
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Brevo Account
+                      {formData.sendingMethod === 'resend_api' ? 'Select Resend Account' : 'Select Brevo Account'}
                     </label>
                     {apiAccountsLoading ? (
                       <div className="text-sm text-gray-500">Loading accounts...</div>
-                    ) : emailApiAccounts.length === 0 ? (
+                    ) : emailApiAccounts.filter((a) =>
+                      formData.sendingMethod === 'resend_api' ? a.provider === 'resend' : a.provider === 'brevo'
+                    ).length === 0 ? (
                       <div className="text-sm text-gray-500">
-                        No Brevo accounts found. Please create one in the &quot;Email API Accounts&quot; section below.
+                        No {formData.sendingMethod === 'resend_api' ? 'Resend' : 'Brevo'} accounts found. Create one below (Email API Accounts).
                       </div>
                     ) : (
                       <select
@@ -474,7 +477,11 @@ export default function SettingsPage() {
                         disabled={saving}
                       >
                         <option value="">Select an account...</option>
-                        {emailApiAccounts.map((account) => (
+                        {emailApiAccounts
+                          .filter((a) =>
+                            formData.sendingMethod === 'resend_api' ? a.provider === 'resend' : a.provider === 'brevo'
+                          )
+                          .map((account) => (
                           <option key={account._id} value={account._id}>
                             {account.name}
                           </option>
@@ -723,10 +730,11 @@ export default function SettingsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Provider</label>
                     <select
                       value={apiAccountForm.provider}
-                      onChange={(e) => setApiAccountForm({...apiAccountForm, provider: e.target.value as 'brevo'})}
+                      onChange={(e) => setApiAccountForm({...apiAccountForm, provider: e.target.value as 'brevo' | 'resend'})}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
                       disabled={apiAccountSaving}
                     >
+                      <option value="resend">Resend</option>
                       <option value="brevo">Brevo</option>
                     </select>
                   </div>
@@ -740,7 +748,7 @@ export default function SettingsPage() {
                         value={apiAccountForm.apiKey}
                         onChange={(e) => setApiAccountForm({...apiAccountForm, apiKey: e.target.value})}
                         className="w-full px-3 py-2 pr-10 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent text-sm"
-                        placeholder="xkeysib-..."
+                        placeholder={apiAccountForm.provider === 'resend' ? 're_...' : 'xkeysib-...'}
                         disabled={apiAccountSaving}
                       />
                       <button

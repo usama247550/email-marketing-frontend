@@ -123,7 +123,7 @@ export interface Project {
   smtpPort: number;
   smtpUser?: string;
   smtpPassword?: string;
-  sendingMethod: 'smtp' | 'brevo_api';
+  sendingMethod: 'smtp' | 'brevo_api' | 'resend_api';
   emailApiAccountId?: string;
   createdAt: string;
 }
@@ -456,7 +456,7 @@ export async function importCsv(file: File): Promise<ImportCsvResponse> {
 export interface EmailApiAccount {
   _id: string;
   name: string;
-  provider: 'brevo';
+  provider: 'brevo' | 'resend';
   apiKey: string;
   keyType?: 'api' | 'smtp' | 'unknown';
   createdAt: string;
